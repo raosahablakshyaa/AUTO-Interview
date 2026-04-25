@@ -96,19 +96,19 @@ function Profile() {
     <div className="w-full min-h-screen bg-gray-50">
 
       {/* Navbar */}
-      <nav className="w-full px-8 py-4 flex items-center justify-between bg-white shadow-sm">
+      <nav className="w-full px-4 sm:px-8 py-4 flex items-center justify-between bg-white shadow-sm">
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => isProfileComplete ? navigate("/") : null}>
           <div className="bg-black text-white p-2 rounded-lg"><TbRobot size={20} /></div>
           <span className="font-bold text-lg">Auto_Interview</span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           {isProfileComplete && (
-            <button onClick={() => navigate("/upload-resume")} className="bg-black text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-gray-800 transition cursor-pointer">
+            <button onClick={() => navigate("/upload-resume")} className="bg-black text-white px-3 sm:px-4 py-2 rounded-full text-sm font-medium hover:bg-gray-800 transition cursor-pointer">
               Start Interview
             </button>
           )}
           <button onClick={handleLogout} className="flex items-center gap-1 text-sm text-gray-500 hover:text-red-500 transition cursor-pointer">
-            <MdLogout size={18} /> Logout
+            <MdLogout size={18} /> <span className="hidden sm:inline">Logout</span>
           </button>
         </div>
       </nav>
@@ -122,12 +122,12 @@ function Profile() {
         </div>
       )}
 
-      <div className="max-w-4xl mx-auto px-6 py-10 space-y-6">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-10 space-y-6">
 
         {/* Profile Card */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-          <div className="flex items-start justify-between mb-6">
-            <div className="flex items-center gap-5">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6">
+            <div className="flex items-center gap-5 mb-4 sm:mb-0">
               <div>
                 {form.picture ? (
                   <img src={form.picture} alt="avatar" className="w-20 h-20 rounded-full object-cover border-2 border-gray-200" />
@@ -162,7 +162,7 @@ function Profile() {
           {success && <p className="text-green-600 text-sm mb-4 bg-green-50 px-4 py-2 rounded-xl">{success}</p>}
           {error && <p className="text-red-500 text-sm mb-4 bg-red-50 px-4 py-2 rounded-xl">{error}</p>}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field icon={<MdPerson size={16} />} label="Full Name" name="name" value={form.name} editing={editing} onChange={handleChange} />
             <Field icon={<MdPhone size={16} />} label="Phone *" name="phone" value={form.phone} editing={editing} onChange={handleChange} placeholder="+91 XXXXX XXXXX" required />
             <Field icon={<MdSchool size={16} />} label="College / University *" name="college" value={form.college} editing={editing} onChange={handleChange} required />
@@ -221,7 +221,7 @@ function Profile() {
         {stats && isProfileComplete && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
             <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2"><MdBarChart size={20} /> Interview Stats</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {[
                 { label: "Total Interviews", value: stats.totalInterviews, color: "text-gray-800" },
                 { label: "Completed", value: stats.completedInterviews, color: "text-green-600" },

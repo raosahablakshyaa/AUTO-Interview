@@ -1,69 +1,87 @@
-import React, { useRef, useState, useCallback } from "react";
+import React, { useRef, useState, useCallback, useEffect } from "react";
 import { TbRobot } from "react-icons/tb";
 import { FcGoogle } from "react-icons/fc";
 import { motion } from "motion/react";
 import axios from "axios";
+import { useDispatch } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import { setUser } from "../redux/userSlice";
+import { auth, provider } from "../utils/firebase";
+import { signInWithPopup } from "firebase/auth";
+import { ServerURL } from "../App";
+
+const THUMB = 48;
 
 function Auth() {
-  const [fillPercent, setFillPercent] = useState(0);
-  const dragging = useRef(false);
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const [fill, setFill] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
   const sliderRef = useRef(null);
-  const thumbSize = 48;
-
-  const handleGoogleLogin = () => {
-    try{
-        const response = await signInWithPopup(auth, provider);
-        let User = response.user;
-        let name = User.displayName;    
-        let email = User.email;
-        const result = await axios.post(`${ServerURL}api/auth/google`, {
-            name,
-            email
-        });
-        console.log(result.data)
-    }catch(error){
-        console.log(`GOOGLE LOGIN ERROR ${error}`)
-    }};
+  const dragging = useRef(false);
 
   const getPercent = useCallback((clientX) => {
     const rect = sliderRef.current.getBoundingClientRect();
-    const maxX = rect.width - thumbSize;
-    const x = Math.min(Math.max(clientX - rect.left - thumbSize / 2, 0), maxX);
-    return (x / maxX) * 100;
+    const max = rect.width - THUMB;
+    const x = Math.min(Math.max(clientX - rect.left - THUMB / 2, 0), max);
+    return (x / max) * 100;
   }, []);
 
-  const onMouseDown = () => { dragging.current = true; };
+  const handleGoogleLogin = async () => {
+    try {
+      const response = await signInWithPopup(auth, provider);
+      const { displayName: name, email, photoURL: picture } = response.user;
+      const res = await axios.post(`${ServerURL}/api/auth/google`, { name, email, picture }, { withCredentials: true });
+      dispatch(setUser(res.data.user));
+      navigate("/");
+    } catch (error) {
+      console.log("GOOGLE LOGIN ERROR", error);
+      setFill(0);
+    }
+  };
 
-  const onMouseMove = useCallback((e) => {
+  const onStart = useCallback(() => {
+    dragging.current = true;
+    setIsDragging(true);
+  }, []);
+
+  const onMove = useCallback((clientX) => {
     if (!dragging.current) return;
-    requestAnimationFrame(() => setFillPercent(getPercent(e.clientX)));
+    setFill(getPercent(clientX));
   }, [getPercent]);
 
-  const onRelease = useCallback((clientX) => {
+  const onEnd = useCallback((clientX) => {
     if (!dragging.current) return;
     dragging.current = false;
+    setIsDragging(false);
     const percent = getPercent(clientX);
-    if (percent >= 90) {
-      setFillPercent(100);
-      setTimeout(handleGoogleLogin, 300);
+    if (percent >= 88) {
+      setFill(100);
+      setTimeout(handleGoogleLogin, 200);
     } else {
-      setFillPercent(0);
+      setFill(0);
     }
   }, [getPercent]);
 
-  const onMouseUp = useCallback((e) => onRelease(e.clientX), [onRelease]);
-  const onTouchMove = useCallback((e) => {
-    requestAnimationFrame(() => setFillPercent(getPercent(e.touches[0].clientX)));
-  }, [getPercent]);
-  const onTouchEnd = useCallback((e) => onRelease(e.changedTouches[0].clientX), [onRelease]);
+  // Mouse events on window so drag works outside slider
+  useEffect(() => {
+    const move = (e) => onMove(e.clientX);
+    const up = (e) => onEnd(e.clientX);
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+    return () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+    };
+  }, [onMove, onEnd]);
 
-  const thumbLeft = `calc(${fillPercent} * (100% - ${thumbSize}px) / 100)`;
+  const thumbLeft = `calc(${fill} * (100% - ${THUMB}px) / 100)`;
 
   return (
     <motion.div
       initial={{ opacity: 0, y: -40 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 1.5 }}
+      transition={{ duration: 0.8 }}
       className="w-full min-h-screen bg-gray-50 flex items-center justify-center px-6"
     >
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-gray-200 p-10">
@@ -82,36 +100,41 @@ function Auth() {
 
         <div
           ref={sliderRef}
-          onMouseMove={onMouseMove}
-          onMouseUp={onMouseUp}
-          onMouseLeave={onMouseUp}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
-          className="relative w-full h-14 rounded-full border border-gray-300 bg-gray-100 overflow-hidden select-none max-w-xs mx-auto"
+          className="relative w-full h-14 rounded-full border border-gray-300 bg-gray-100 overflow-hidden select-none"
         >
+          {/* Fill bar */}
           <div
             className="absolute top-0 left-0 h-full bg-blue-500 rounded-full"
             style={{
-              width: `calc(${fillPercent} * (100% - ${thumbSize}px) / 100 + ${thumbSize}px)`,
-              transition: dragging.current ? 'none' : 'width 0.3s ease'
+              width: `calc(${fill} * (100% - ${THUMB}px) / 100 + ${THUMB}px)`,
+              transition: isDragging ? "none" : "width 0.3s ease",
             }}
           />
+
+          {/* Label */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <span className="text-sm font-medium text-gray-600">Slide to sign in</span>
+            <span className={`text-sm font-medium transition-colors ${fill > 40 ? "text-white" : "text-gray-500"}`}>
+              {fill >= 88 ? "Signing in..." : "Slide to sign in →"}
+            </span>
           </div>
+
+          {/* Thumb */}
           <div
-            onMouseDown={onMouseDown}
-            onTouchStart={onMouseDown}
+            onMouseDown={onStart}
+            onTouchStart={(e) => { onStart(); onMove(e.touches[0].clientX); }}
+            onTouchMove={(e) => onMove(e.touches[0].clientX)}
+            onTouchEnd={(e) => onEnd(e.changedTouches[0].clientX)}
             className="absolute top-1 h-12 w-12 bg-white rounded-full shadow-md flex items-center justify-center cursor-grab active:cursor-grabbing z-10 border border-gray-200"
             style={{
               left: thumbLeft,
-              transition: dragging.current ? 'none' : 'left 0.3s ease'
+              transition: isDragging ? "none" : "left 0.3s ease",
             }}
           >
             <FcGoogle size={22} />
           </div>
         </div>
 
+        <p className="text-center text-xs text-gray-400 mt-4">Drag the Google icon all the way to sign in</p>
       </div>
     </motion.div>
   );

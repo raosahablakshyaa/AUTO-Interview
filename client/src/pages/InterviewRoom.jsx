@@ -39,14 +39,17 @@ function InterviewRoom() {
   const [warningCount, setWarningCount] = useState(0);
   const [cameraOn, setCameraOn] = useState(true);
   const [timeLeft, setTimeLeft] = useState(timePerQ);
-  const [phase, setPhase] = useState("intro"); // intro | greeting | doubts | question | answering | finished
+  const [phase, setPhase] = useState("intro");
   const [aiGender] = useState(Math.random() > 0.5 ? "female" : "male");
   const [codeAnswer, setCodeAnswer] = useState("");
   const [faceStatus, setFaceStatus] = useState("ok");
   const [isBlurred, setIsBlurred] = useState(false);
   const [warningAlert, setWarningAlert] = useState(null);
   const [aiText, setAiText] = useState("");
-  const [nextTimeLimit, setNextTimeLimit] = useState(timePerQ); // what AI is currently saying
+  const [nextTimeLimit, setNextTimeLimit] = useState(timePerQ);
+  const [doubtTranscript, setDoubtTranscript] = useState("");
+  const [isListeningDoubt, setIsListeningDoubt] = useState(false);
+  const doubtRecognitionRef = useRef(null);
 
   // Keep answersRef in sync
   useEffect(() => { answersRef.current = answers; }, [answers]);
@@ -346,43 +349,116 @@ function InterviewRoom() {
   };
 
   const handleNoDoubts = () => {
+    doubtRecognitionRef.current?.stop();
+    setIsListeningDoubt(false);
     const msg = language === "hindi"
-      ? "Bilkul theek hai! Toh chaliye shuru karte hain. Dhyaan se suniye aur soch samajh kar jawab dijiye."
+      ? "बिल्कुल ठीक है! तो चलिए शुरू करते हैं। ध्यान से सुनिए और सोच समझकर जवाब दीजिए।"
       : language === "hinglish"
       ? "Perfect! Toh chaliye shuru karte hain. Dhyaan se suniye aur naturally answer kijiye."
       : "Perfect! No worries at all. Alright then, let's get started. Listen carefully and take your time with each answer.";
     speakAI(msg, () => { setPhase("question"); askQuestion(0); });
   };
 
-  const questionPrefixes = language === "hindi"
-    ? [
-        "अच्छा, पहला सवाल — ",
-        "ठीक है, अगला सवाल — ",
-        "अब यह बताइए — ",
-        "दिलचस्प, अब यह पूछना चाहता हूं — ",
-        "अच्छा, एक और — ",
-        "चलिए आगे बढ़ते हैं — ",
-        "बस अंतिम सवाल — ",
-      ]
-    : language === "hinglish"
-    ? [
-        "Achha, pehla question — ",
-        "Theek hai, agli baat — ",
-        "Ab yeh batao — ",
-        "Interesting, ab yeh puchna chahta hoon — ",
-        "Achha, ek aur — ",
-        "Chaliye aage badhte hain — ",
-        "Bas ek aakhri sawaal — ",
-      ]
-    : [
-        "Alright, here's my first question for you — ",
-        "Great, moving on — ",
-        "Okay, next one — ",
-        "Interesting, now let me ask you — ",
-        "Good, here's another one — ",
-        "Alright, let's go a bit deeper — ",
-        "Almost there, just a couple more — ",
-      ];
+  const handleSubmitDoubt = async () => {
+    const doubt = doubtTranscript.trim();
+    doubtRecognitionRef.current?.stop();
+    setIsListeningDoubt(false);
+    if (!doubt) { handleNoDoubts(); return; }
+
+    setDoubtTranscript("");
+    const thinking = language === "hindi" ? "एक पल..." : language === "hinglish" ? "Ek second..." : "One moment...";
+    speakAI(thinking);
+
+    try {
+      const res = await fetch(`${ServerURL}/api/interview/reply-doubt`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ doubt, language, candidateName }),
+      });
+      const data = await res.json();
+      speakAI(data.reply, () => setPhase("doubts"));
+    } catch {
+      const fallback = language === "hindi" ? "अच्छा सवाल है! चलिए शुरू करते हैं।" : language === "hinglish" ? "Achha sawaal! Chaliye shuru karte hain." : "Great question! Let's get started.";
+      speakAI(fallback, () => setPhase("doubts"));
+    }
+  };
+
+  const startListeningDoubt = () => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return;
+    const r = new SR();
+    r.continuous = false;
+    r.interimResults = true;
+    r.lang = language === "hindi" ? "hi-IN" : "en-US";
+    r.onresult = (e) => {
+      const t = Array.from(e.results).map(x => x[0].transcript).join("");
+      setDoubtTranscript(t);
+    };
+    r.onend = () => setIsListeningDoubt(false);
+    r.start();
+    doubtRecognitionRef.current = r;
+    setIsListeningDoubt(true);
+  };
+
+  const questionPrefixes = {
+    hindi: [
+      "अच्छा, पहला सवाल — ",
+      "ठीक है, अगला सवाल — ",
+      "अब यह बताइए — ",
+      "दिलचस्प, अब यह पूछना चाहता हूं — ",
+      "अच्छा, एक और — ",
+      "चलिए आगे बढ़ते हैं — ",
+      "बस अंतिम सवाल — ",
+      "यह भी बताइए — ",
+      "एक और महत्वपूर्ण सवाल — ",
+      "अंत में — ",
+    ],
+    hinglish: [
+      "Achha, pehla question — ",
+      "Theek hai, agli baat — ",
+      "Ab yeh batao — ",
+      "Interesting, ab yeh puchna chahta hoon — ",
+      "Achha, ek aur — ",
+      "Chaliye aage badhte hain — ",
+      "Bas ek aakhri sawaal — ",
+      "Yeh bhi batao — ",
+      "Ek aur important question — ",
+      "Aakhir mein — ",
+    ],
+    english: [
+      "Alright, here's my first question — ",
+      "Great, moving on — ",
+      "Okay, next one — ",
+      "Interesting, now let me ask you — ",
+      "Good, here's another one — ",
+      "Alright, let's go a bit deeper — ",
+      "Almost there — ",
+      "Here's another important one — ",
+      "Let me ask you this — ",
+      "And finally — ",
+    ],
+  };
+
+  const usedPrefixesRef = useRef(new Set());
+
+  const getUniquePrefix = (index) => {
+    const list = questionPrefixes[language] || questionPrefixes.english;
+    // First question always uses index 0
+    if (index === 0) { usedPrefixesRef.current.add(0); return list[0]; }
+    // Last question always uses last prefix
+    if (index === questions.length - 1) {
+      const last = list.length - 1;
+      usedPrefixesRef.current.add(last);
+      return list[last];
+    }
+    // Pick unused prefix from middle range
+    const available = list.map((_, i) => i).filter(i => i !== 0 && i !== list.length - 1 && !usedPrefixesRef.current.has(i));
+    if (available.length === 0) usedPrefixesRef.current.clear();
+    const pick = available.length > 0 ? available[Math.floor(Math.random() * available.length)] : (index % list.length);
+    usedPrefixesRef.current.add(pick);
+    return list[pick];
+  };
 
   const askQuestion = (index, customTime) => {
     if (index >= questions.length) { finishInterview(); return; }
@@ -392,7 +468,7 @@ function InterviewRoom() {
     setNextTimeLimit(t);
     setTranscript("");
     setCodeAnswer("");
-    const prefix = index === 0 ? "So, here's my first question — " : questionPrefixes[index] || "Next question — ";
+    const prefix = getUniquePrefix(index);
     speakAI(prefix + cleanQuestion(questions[index]), () => setPhase("answering"));
   };
 
@@ -478,7 +554,7 @@ function InterviewRoom() {
             initial={{ opacity: 0, y: -40 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -40 }}
-            className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-red-500 text-white px-6 py-3 rounded-full flex items-center gap-2 shadow-lg"
+            className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-red-500 text-white px-4 sm:px-6 py-3 rounded-full flex items-center gap-2 shadow-lg text-sm w-max max-w-[90vw]"
           >
             <MdWarning size={18} /> {warningAlert}
           </motion.div>
@@ -489,15 +565,15 @@ function InterviewRoom() {
       <canvas ref={faceCanvasRef} className="hidden" />
 
       {/* Top Bar */}
-      <div className="flex items-center justify-between px-6 py-3 bg-gray-800 border-b border-gray-700">
+      <div className="flex items-center justify-between px-3 sm:px-6 py-3 bg-gray-800 border-b border-gray-700 flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <div className="bg-white text-black p-1.5 rounded-lg">
             <TbRobot size={18} />
           </div>
-          <span className="font-bold">Auto_Interview</span>
-          <span className="ml-2 text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full">● LIVE PROCTORED</span>
+          <span className="font-bold text-sm sm:text-base">Auto_Interview</span>
+          <span className="ml-1 text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full hidden sm:inline">● LIVE PROCTORED</span>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
           {phase === "answering" && (
             <div className={`px-3 py-1 rounded-full text-sm font-mono font-bold ${timeLeft < 30 ? "bg-red-500" : nextTimeLimit > timePerQ ? "bg-green-600" : "bg-gray-700"}`}>
               {formatTime(timeLeft)}
@@ -506,7 +582,6 @@ function InterviewRoom() {
           )}
           <div className="text-sm text-gray-400">Q {currentQ + 1}/{questions.length}</div>
 
-          {/* Face status */}
           {faceStatus !== "ok" && (
             <div className="flex items-center gap-1 bg-orange-500/20 text-orange-400 px-3 py-1 rounded-full text-xs">
               <MdFaceRetouchingOff size={14} /> {faceStatus === "no-face" ? "No Face" : "Multiple Faces"}
@@ -515,7 +590,7 @@ function InterviewRoom() {
 
           {warningCount > 0 && (
             <div className="flex items-center gap-1 bg-red-500/20 text-red-400 px-3 py-1 rounded-full text-sm">
-              <MdWarning size={14} /> {warningCount}/5 warnings
+              <MdWarning size={14} /> {warningCount}/5
             </div>
           )}
           {phase === "answering" && (
@@ -530,7 +605,7 @@ function InterviewRoom() {
       </div>
 
       {/* Main Area */}
-      <div className="flex flex-1 gap-4 p-4">
+      <div className="flex flex-col lg:flex-row flex-1 gap-4 p-3 sm:p-4 overflow-auto">
 
         {/* AI Video + Question */}
         <div className="flex-1 flex flex-col gap-4">
@@ -598,7 +673,7 @@ function InterviewRoom() {
         </div>
 
         {/* Right Panel */}
-        <div className="w-80 flex flex-col gap-4">
+        <div className="w-full lg:w-80 flex flex-col gap-4">
 
           {/* User Camera */}
           <div className="relative bg-gray-800 rounded-2xl overflow-hidden h-52">
@@ -648,16 +723,30 @@ function InterviewRoom() {
             </div>
           )}
 
-          {/* Doubts phase — No doubts button */}
+          {/* Doubts phase */}
           {phase === "doubts" && (
-            <motion.button
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              onClick={handleNoDoubts}
-              className="w-full bg-white text-black py-3 rounded-xl font-medium hover:bg-gray-200 transition cursor-pointer"
-            >
-              {language === "hindi" ? "कोई सवाल नहीं, शुरू करें →" : language === "hinglish" ? "Koi sawaal nahi, shuru karein →" : "No doubts, let's begin →"}
-            </motion.button>
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-gray-800 rounded-2xl p-4 flex flex-col gap-3">
+              <p className="text-xs text-gray-400">
+                {language === "hindi" ? "कोई सवाल है? बोलिए या सीधे शुरू करें" : language === "hinglish" ? "Koi sawaal? Boliye ya seedha shuru karein" : "Any doubts? Speak or skip"}
+              </p>
+              {doubtTranscript && <p className="text-sm text-gray-300 bg-gray-700 rounded-xl px-3 py-2">{doubtTranscript}</p>}
+              <div className="flex gap-2">
+                <button
+                  onClick={isListeningDoubt ? () => { doubtRecognitionRef.current?.stop(); setIsListeningDoubt(false); } : startListeningDoubt}
+                  className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-sm cursor-pointer ${isListeningDoubt ? "bg-red-500" : "bg-gray-700 hover:bg-gray-600"}`}
+                >
+                  {isListeningDoubt ? <><MdMicOff size={14} /> {language === "hindi" ? "रोकें" : "Stop"}</> : <><MdMic size={14} /> {language === "hindi" ? "बोलें" : language === "hinglish" ? "Boliye" : "Ask"}</>}
+                </button>
+                {doubtTranscript && (
+                  <button onClick={handleSubmitDoubt} className="flex-1 bg-blue-600 hover:bg-blue-700 py-2 rounded-xl text-sm cursor-pointer">
+                    {language === "hindi" ? "भेजें" : language === "hinglish" ? "Submit" : "Submit"}
+                  </button>
+                )}
+                <button onClick={handleNoDoubts} className="flex-1 bg-white text-black py-2 rounded-xl text-sm font-medium hover:bg-gray-200 cursor-pointer">
+                  {language === "hindi" ? "शुरू करें →" : language === "hinglish" ? "Shuru →" : "Begin →"}
+                </button>
+              </div>
+            </motion.div>
           )}
 
           {/* Next Button */}

@@ -199,14 +199,14 @@ function CareerSelector({ onStart }) {
   const reset = () => { setStep(0); setSelected({ category: "", subcategory: "", branch: "", company: "" }); };
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-16">
-      <div className="text-center mb-10">
-        <h2 className="text-3xl font-bold text-gray-900 mb-3">Choose Your Path</h2>
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10 sm:py-16">
+      <div className="text-center mb-8 sm:mb-10">
+        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3">Choose Your Path</h2>
         <p className="text-gray-500">Select your goal and we'll prepare a personalized interview experience</p>
       </div>
 
       {/* Step indicator */}
-      <div className="flex items-center justify-center gap-2 mb-10">
+      <div className="flex items-center justify-center flex-wrap gap-2 mb-8 sm:mb-10">
         {steps.map((s, i) => (
           <React.Fragment key={i}>
             <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${i < step ? "bg-black text-white" : i === step ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-400"}`}>
@@ -223,7 +223,7 @@ function CareerSelector({ onStart }) {
         {/* Step 0 — Category */}
         {step === 0 && (
           <motion.div key="step0" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }}>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
               {Object.entries(careerData).map(([cat, val]) => (
                 <button key={cat} onClick={() => handleCategory(cat)}
                   className="bg-white border border-gray-200 rounded-2xl overflow-hidden hover:border-black hover:shadow-md transition-all cursor-pointer group text-left">
@@ -244,7 +244,7 @@ function CareerSelector({ onStart }) {
         {step === 1 && (
           <motion.div key="step1" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }}>
             <p className="text-center text-sm text-gray-500 mb-6">You selected: <span className="font-semibold text-black">{selected.category}</span></p>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
               {Object.keys(category?.subcategories || {}).map((sub) => (
                 <button key={sub} onClick={() => handleSubcategory(sub)}
                   className="bg-white border border-gray-200 rounded-2xl p-5 text-left hover:border-black hover:shadow-md transition-all cursor-pointer">
@@ -264,7 +264,7 @@ function CareerSelector({ onStart }) {
             <p className="text-center text-sm text-gray-500 mb-6">
               <span className="font-semibold text-black">{selected.category}</span> → <span className="font-semibold text-black">{selected.subcategory}</span>
             </p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {subcategory?.branches && branchList.map((branch) => (
                 <button key={branch} onClick={() => handleBranch(branch)}
                   className="bg-white border border-gray-200 rounded-xl p-4 text-sm font-medium text-gray-700 hover:border-black hover:shadow-md transition-all cursor-pointer text-center">
@@ -282,7 +282,7 @@ function CareerSelector({ onStart }) {
         {step === 3 && (
           <motion.div key="step3" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }}>
             <p className="text-center text-sm text-gray-500 mb-6">Which company are you targeting?</p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {companyList.map((co) => (
                 <button key={co} onClick={() => handleCompany(co)}
                   className="bg-white border border-gray-200 rounded-xl p-4 text-sm font-medium text-gray-700 hover:border-black hover:shadow-md transition-all cursor-pointer text-center">
@@ -307,7 +307,7 @@ function CareerSelector({ onStart }) {
                 <span key={i} className="bg-gray-100 text-gray-700 text-xs px-3 py-1 rounded-full font-medium">{s}</span>
               ))}
             </div>
-            <div className="grid grid-cols-2 gap-2 mb-6 text-left">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-6 text-left">
               {["Mock Interview", "Interview Questions", "Resume Guidance", "Preparation Roadmap", "Eligibility Guidance", "Improvement Suggestions"].map((item, i) => (
                 <div key={i} className="flex items-center gap-2 text-sm text-gray-600">
                   <MdCheck size={14} className="text-green-500 flex-shrink-0" /> {item}
@@ -342,13 +342,13 @@ function Home() {
     <div className="w-full min-h-screen bg-gray-50">
 
       {/* Navbar */}
-      <nav className="w-full px-8 py-4 flex items-center justify-between bg-white shadow-sm sticky top-0 z-40">
+      <nav className="w-full px-4 sm:px-8 py-4 flex items-center justify-between bg-white shadow-sm sticky top-0 z-40">
         <div className="flex items-center gap-2">
           <div className="bg-black text-white p-2 rounded-lg"><TbRobot size={20} /></div>
           <span className="font-bold text-lg">Auto_Interview</span>
         </div>
-        <div className="flex items-center gap-4">
-          {user && <span className="text-sm text-gray-600">Credits: <span className="font-bold text-black">{user.credits}</span></span>}
+        <div className="flex items-center gap-2 sm:gap-4">
+          {user && <span className="hidden sm:inline text-sm text-gray-600">Credits: <span className="font-bold text-black">{user.credits}</span></span>}
           {user && (
             <div onClick={() => navigate("/profile")}
               className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center text-sm font-bold cursor-pointer hover:bg-gray-800 transition overflow-hidden">
@@ -356,19 +356,19 @@ function Home() {
             </div>
           )}
           <button onClick={() => navigate(user ? "/upload-resume" : "/auth")}
-            className="bg-black text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-gray-800 transition cursor-pointer">
-            {user ? "Start Interview" : "Get Started"}
+            className="bg-black text-white px-4 sm:px-5 py-2 rounded-full text-sm font-medium hover:bg-gray-800 transition cursor-pointer">
+            {user ? "Start" : "Get Started"}
           </button>
         </div>
       </nav>
 
       {/* Hero */}
       <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}
-        className="max-w-5xl mx-auto px-6 py-20 text-center">
-        <h1 className="text-5xl font-bold text-gray-900 mb-6 leading-tight">
+        className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-20 text-center">
+        <h1 className="text-3xl sm:text-5xl font-bold text-gray-900 mb-4 sm:mb-6 leading-tight">
           AI-Powered Interview <br /> Practice Platform
         </h1>
-        <p className="text-gray-500 text-lg mb-10 max-w-2xl mx-auto">
+        <p className="text-gray-500 text-base sm:text-lg mb-8 sm:mb-10 max-w-2xl mx-auto">
           Upload your resume, get personalized questions, practice with an AI interviewer, and receive detailed performance analysis.
         </p>
         <button onClick={() => navigate(user ? "/upload-resume" : "/auth")}
@@ -378,7 +378,7 @@ function Home() {
       </motion.div>
 
       {/* Features */}
-      <div className="max-w-5xl mx-auto px-6 pb-20 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 pb-12 sm:pb-20 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         {features.map((f, i) => (
           <motion.div key={i} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.1 }} viewport={{ once: true }}
@@ -397,9 +397,9 @@ function Home() {
 
       {/* How it works */}
       <div className="bg-gray-50 py-16">
-        <div className="max-w-4xl mx-auto px-6 text-center">
-          <h2 className="text-3xl font-bold text-gray-900 mb-12">How It Works</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
+          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-8 sm:mb-12">How It Works</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8">
             {[
               { step: "01", title: "Upload Resume", desc: "Upload your PDF resume", img: resumeImg },
               { step: "02", title: "AI Interview", desc: "Answer AI questions on camera", img: aiImg },

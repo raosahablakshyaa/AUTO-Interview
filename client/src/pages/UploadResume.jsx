@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { TbRobot } from "react-icons/tb";
-import { MdOutlineUploadFile, MdPictureAsPdf, MdCheckCircle, MdCancel, MdTrendingUp, MdWarning } from "react-icons/md";
+import { MdOutlineUploadFile, MdPictureAsPdf, MdCheckCircle, MdCancel, MdTrendingUp, MdWarning, MdCode, MdWork, MdSchool, MdLightbulb } from "react-icons/md";
 import { motion, AnimatePresence } from "motion/react";
 import axios from "axios";
 import { ServerURL } from "../App";
@@ -20,10 +20,10 @@ const languages = [
 ];
 
 const durations = [
-  { id: 15, label: "15 min", questions: 3, timePerQ: 180 },
-  { id: 30, label: "30 min", questions: 5, timePerQ: 240 },
-  { id: 45, label: "45 min", questions: 7, timePerQ: 300 },
-  { id: 60, label: "60 min", questions: 10, timePerQ: 300 },
+  { id: 15, label: "15 min", questions: 3, timePerQ: 180, credits: 5 },
+  { id: 30, label: "30 min", questions: 5, timePerQ: 240, credits: 10 },
+  { id: 45, label: "45 min", questions: 7, timePerQ: 300, credits: 15 },
+  { id: 60, label: "60 min", questions: 10, timePerQ: 300, credits: 20 },
 ];
 
 function UploadResume() {
@@ -72,7 +72,8 @@ function UploadResume() {
 
   const handleStartInterview = async () => {
     if (!file) return setError("Please upload a resume");
-    if (user.credits < 10) return setError("Insufficient credits");
+    const selectedDuration = durations.find(d => d.id === duration);
+    if (user.credits < selectedDuration.credits) return setError(`Insufficient credits. Need ${selectedDuration.credits} credits for ${selectedDuration.label} interview.`);
     setLoading(true);
     try {
       const formData = new FormData();
@@ -81,6 +82,7 @@ function UploadResume() {
       formData.append("language", language);
       const selectedDuration = durations.find(d => d.id === duration);
       formData.append("questionCount", selectedDuration.questions);
+      formData.append("credits", selectedDuration.credits);
       const res = await axios.post(`${ServerURL}/api/interview/generate`, formData, {
         withCredentials: true,
         headers: { "Content-Type": "multipart/form-data" }
@@ -106,24 +108,24 @@ function UploadResume() {
   };
 
   return (
-    <div className="w-full min-h-screen bg-gray-50 px-6 py-12">
+    <div className="w-full min-h-screen bg-gray-50 px-4 sm:px-6 py-8 sm:py-12">
       <div className="max-w-5xl mx-auto">
 
         {/* Header */}
-        <div className="flex items-center gap-2 mb-10">
+        <div className="flex items-center gap-2 mb-8 sm:mb-10">
           <div className="bg-black text-white p-2 rounded-lg">
             <TbRobot size={20} />
           </div>
           <span className="font-bold text-lg">Auto_Interview</span>
         </div>
 
-        <div className="flex gap-6 items-start">
+        <div className="flex flex-col lg:flex-row gap-6 items-start">
 
           {/* Left - Upload Card */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-gray-200 p-8 flex-shrink-0"
+            className="w-full lg:max-w-md bg-white rounded-2xl shadow-xl border border-gray-200 p-6 sm:p-8 flex-shrink-0"
           >
             <h2 className="text-2xl font-bold text-gray-800 mb-1">Upload Resume</h2>
             <p className="text-gray-500 text-sm mb-6">AI will analyze your resume and generate interview questions</p>
@@ -171,7 +173,7 @@ function UploadResume() {
             {resumeAnalysis && (
               <div className="mb-4">
                 <p className="text-sm font-medium text-gray-700 mb-3">Interview Type</p>
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-3">
                   {interviewTypes.map((t) => (
                     <button
                       key={t.id}
@@ -188,7 +190,7 @@ function UploadResume() {
             {resumeAnalysis && (
               <div className="mb-4">
                 <p className="text-sm font-medium text-gray-700 mb-3">Interview Language</p>
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-3">
                   {languages.map((l) => (
                     <button
                       key={l.id}
@@ -217,6 +219,7 @@ function UploadResume() {
                     >
                       <span className="font-bold">{d.label}</span>
                       <span className={`text-xs ${duration === d.id ? "text-gray-300" : "text-gray-400"}`}>{d.questions} questions</span>
+                      <span className={`text-xs font-semibold ${duration === d.id ? "text-yellow-300" : "text-yellow-600"}`}>{d.credits} credits</span>
                     </button>
                   ))}
                 </div>
@@ -231,108 +234,161 @@ function UploadResume() {
               disabled={loading || !file}
               className="w-full bg-black text-white py-3 rounded-xl font-medium hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
-              {loading ? "Generating Questions..." : "Start Interview (10 credits)"}
+              {loading ? "Generating Questions..." : `Start Interview (${durations.find(d => d.id === duration)?.credits} credits)`}
             </button>
           </motion.div>
 
           {/* Right - Resume Analysis */}
           <AnimatePresence>
             {resumeAnalysis && (
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                className="flex-1 space-y-4"
-              >
+              <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="flex-1 space-y-4">
+
                 {/* Verdict */}
-                {(() => {
-                  const config = getVerdictConfig(resumeAnalysis.verdict);
-                  return (
-                    <div className={`rounded-2xl border p-5 ${config.color}`}>
-                      <div className="flex items-center gap-2 mb-2">
-                        {config.icon}
-                        <span className={`font-bold text-lg ${config.text}`}>{config.label}</span>
-                        <span className={`ml-auto text-3xl font-bold ${getScoreColor(resumeAnalysis.score)}`}>{resumeAnalysis.score}/100</span>
-                      </div>
-                      <p className={`text-sm ${config.text}`}>{resumeAnalysis.summary}</p>
+                {(() => { const config = getVerdictConfig(resumeAnalysis.verdict); return (
+                  <div className={`rounded-2xl border p-5 ${config.color}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      {config.icon}
+                      <span className={`font-bold text-lg ${config.text}`}>{config.label}</span>
+                      <span className={`ml-auto text-3xl font-bold ${getScoreColor(resumeAnalysis.score)}`}>{resumeAnalysis.score}/100</span>
                     </div>
-                  );
-                })()}
+                    <p className={`text-sm ${config.text}`}>{resumeAnalysis.summary}</p>
+                  </div>
+                ); })()}
+
+                {/* Section Scores */}
+                {resumeAnalysis.sectionScores && (
+                  <div className="bg-white rounded-2xl border border-gray-200 p-5">
+                    <h3 className="font-semibold text-gray-800 mb-4">Section Scores</h3>
+                    {Object.entries(resumeAnalysis.sectionScores).map(([key, val], i) => (
+                      <div key={i} className="mb-3">
+                        <div className="flex justify-between text-sm mb-1">
+                          <span className="text-gray-600 capitalize">{key}</span>
+                          <span className={`font-semibold ${getScoreColor(val)}`}>{val}%</span>
+                        </div>
+                        <div className="w-full bg-gray-100 rounded-full h-1.5">
+                          <motion.div initial={{ width: 0 }} animate={{ width: `${val}%` }} transition={{ duration: 0.7, delay: i * 0.1 }}
+                            className={`h-1.5 rounded-full ${val >= 70 ? "bg-green-500" : val >= 50 ? "bg-yellow-500" : "bg-red-500"}`} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* ATS Score */}
                 <div className="bg-white rounded-2xl border border-gray-200 p-5">
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-semibold text-gray-800">ATS Score</h3>
+                    <h3 className="font-semibold text-gray-800">ATS Compatibility</h3>
                     <span className={`text-2xl font-bold ${getScoreColor(resumeAnalysis.atsScore)}`}>{resumeAnalysis.atsScore}%</span>
                   </div>
                   <div className="w-full bg-gray-100 rounded-full h-2 mb-4">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${resumeAnalysis.atsScore}%` }}
-                      transition={{ duration: 0.8 }}
-                      className={`h-2 rounded-full ${resumeAnalysis.atsScore >= 70 ? "bg-green-500" : resumeAnalysis.atsScore >= 50 ? "bg-yellow-500" : "bg-red-500"}`}
-                    />
+                    <motion.div initial={{ width: 0 }} animate={{ width: `${resumeAnalysis.atsScore}%` }} transition={{ duration: 0.8 }}
+                      className={`h-2 rounded-full ${resumeAnalysis.atsScore >= 70 ? "bg-green-500" : resumeAnalysis.atsScore >= 50 ? "bg-yellow-500" : "bg-red-500"}`} />
                   </div>
-                  <ul className="space-y-1">
+                  <ul className="space-y-1.5">
                     {resumeAnalysis.atsTips?.map((tip, i) => (
-                      <li key={i} className="text-sm text-gray-600 flex items-start gap-2">
-                        <span className="text-blue-500 mt-0.5">•</span>{tip}
-                      </li>
+                      <li key={i} className="text-sm text-gray-600 flex items-start gap-2"><span className="text-blue-500 mt-0.5">•</span>{tip}</li>
                     ))}
                   </ul>
                 </div>
 
-                {/* Strong & Weak */}
-                <div className="grid grid-cols-2 gap-4">
+                {/* Bullet Point Analysis */}
+                {resumeAnalysis.bulletPointAnalysis && (
                   <div className="bg-white rounded-2xl border border-gray-200 p-5">
-                    <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                      <MdCheckCircle className="text-green-500" /> Strong Points
-                    </h3>
+                    <h3 className="font-semibold text-gray-800 mb-3">Bullet Point Quality</h3>
+                    <div className="flex gap-3 mb-3">
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${resumeAnalysis.bulletPointAnalysis.hasMetrics ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                        {resumeAnalysis.bulletPointAnalysis.hasMetrics ? "✓ Has Metrics" : "✗ No Metrics"}
+                      </span>
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${resumeAnalysis.bulletPointAnalysis.usesActionVerbs ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                        {resumeAnalysis.bulletPointAnalysis.usesActionVerbs ? "✓ Action Verbs" : "✗ Weak Verbs"}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600">{resumeAnalysis.bulletPointAnalysis.feedback}</p>
+                  </div>
+                )}
+
+                {/* Strong & Weak */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="bg-white rounded-2xl border border-gray-200 p-5">
+                    <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2"><MdCheckCircle className="text-green-500" /> Strong Points</h3>
                     <ul className="space-y-2">
                       {resumeAnalysis.strongPoints?.map((p, i) => (
-                        <li key={i} className="text-sm text-gray-600 flex items-start gap-2">
-                          <span className="w-2 h-2 bg-green-500 rounded-full mt-1.5 flex-shrink-0" />{p}
-                        </li>
+                        <li key={i} className="text-sm text-gray-600 flex items-start gap-2"><span className="w-2 h-2 bg-green-500 rounded-full mt-1.5 flex-shrink-0" />{p}</li>
                       ))}
                     </ul>
                   </div>
                   <div className="bg-white rounded-2xl border border-gray-200 p-5">
-                    <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                      <MdCancel className="text-red-500" /> Weak Points
-                    </h3>
+                    <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2"><MdCancel className="text-red-500" /> Weak Points</h3>
                     <ul className="space-y-2">
                       {resumeAnalysis.weakPoints?.map((p, i) => (
-                        <li key={i} className="text-sm text-gray-600 flex items-start gap-2">
-                          <span className="w-2 h-2 bg-red-500 rounded-full mt-1.5 flex-shrink-0" />{p}
-                        </li>
+                        <li key={i} className="text-sm text-gray-600 flex items-start gap-2"><span className="w-2 h-2 bg-red-500 rounded-full mt-1.5 flex-shrink-0" />{p}</li>
                       ))}
                     </ul>
                   </div>
+                </div>
+
+                {/* Keywords */}
+                <div className="bg-white rounded-2xl border border-gray-200 p-5">
+                  <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2"><MdCode className="text-purple-500" /> Keywords Analysis</h3>
+                  {resumeAnalysis.keywordsFound?.length > 0 && (
+                    <div className="mb-3">
+                      <p className="text-xs text-gray-500 mb-2 font-medium">✓ Found in your resume</p>
+                      <div className="flex flex-wrap gap-2">
+                        {resumeAnalysis.keywordsFound.map((k, i) => <span key={i} className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs">{k}</span>)}
+                      </div>
+                    </div>
+                  )}
+                  {resumeAnalysis.keywordsMissing?.length > 0 && (
+                    <div>
+                      <p className="text-xs text-gray-500 mb-2 font-medium">✗ Missing — add these</p>
+                      <div className="flex flex-wrap gap-2">
+                        {resumeAnalysis.keywordsMissing.map((k, i) => <span key={i} className="bg-red-100 text-red-700 px-2 py-0.5 rounded-full text-xs">{k}</span>)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Section Analysis */}
+                <div className="space-y-3">
+                  {resumeAnalysis.experienceAnalysis && (
+                    <div className="bg-white rounded-2xl border border-gray-200 p-5">
+                      <h3 className="font-semibold text-gray-800 mb-2 flex items-center gap-2"><MdWork className="text-blue-500" /> Experience Analysis</h3>
+                      <p className="text-sm text-gray-600">{resumeAnalysis.experienceAnalysis}</p>
+                    </div>
+                  )}
+                  {resumeAnalysis.educationAnalysis && (
+                    <div className="bg-white rounded-2xl border border-gray-200 p-5">
+                      <h3 className="font-semibold text-gray-800 mb-2 flex items-center gap-2"><MdSchool className="text-indigo-500" /> Education Analysis</h3>
+                      <p className="text-sm text-gray-600">{resumeAnalysis.educationAnalysis}</p>
+                    </div>
+                  )}
+                  {resumeAnalysis.skillsAnalysis && (
+                    <div className="bg-white rounded-2xl border border-gray-200 p-5">
+                      <h3 className="font-semibold text-gray-800 mb-2 flex items-center gap-2"><MdCode className="text-purple-500" /> Skills Analysis</h3>
+                      <p className="text-sm text-gray-600">{resumeAnalysis.skillsAnalysis}</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Missing Sections */}
                 {resumeAnalysis.missingSection?.length > 0 && (
                   <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-5">
-                    <h3 className="font-semibold text-yellow-800 mb-3 flex items-center gap-2">
-                      <MdWarning className="text-yellow-500" /> Missing Sections
-                    </h3>
+                    <h3 className="font-semibold text-yellow-800 mb-3 flex items-center gap-2"><MdWarning className="text-yellow-500" /> Missing Sections</h3>
                     <div className="flex flex-wrap gap-2">
-                      {resumeAnalysis.missingSection.map((s, i) => (
-                        <span key={i} className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-sm">{s}</span>
-                      ))}
+                      {resumeAnalysis.missingSection.map((s, i) => <span key={i} className="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-sm">{s}</span>)}
                     </div>
                   </div>
                 )}
 
                 {/* Improvements */}
                 <div className="bg-white rounded-2xl border border-gray-200 p-5">
-                  <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                    <MdTrendingUp className="text-blue-500" /> How to Improve
-                  </h3>
+                  <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2"><MdTrendingUp className="text-blue-500" /> Improvement Plan</h3>
                   <ul className="space-y-3">
                     {resumeAnalysis.improvements?.map((item, i) => (
                       <li key={i} className="flex items-start gap-3">
-                        <span className="bg-blue-100 text-blue-600 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">{i + 1}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold flex-shrink-0 mt-0.5 ${
+                          item.priority === "high" ? "bg-red-100 text-red-600" : item.priority === "medium" ? "bg-yellow-100 text-yellow-600" : "bg-gray-100 text-gray-500"
+                        }`}>{item.priority?.toUpperCase() || i + 1}</span>
                         <div>
                           <span className="text-sm font-medium text-gray-800">{item.section}: </span>
                           <span className="text-sm text-gray-600">{item.tip}</span>
@@ -341,6 +397,20 @@ function UploadResume() {
                     ))}
                   </ul>
                 </div>
+
+                {/* Overall Tips */}
+                {resumeAnalysis.overallTips?.length > 0 && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5">
+                    <h3 className="font-semibold text-blue-800 mb-3 flex items-center gap-2"><MdLightbulb className="text-blue-500" /> Top 3 High-Impact Tips</h3>
+                    <ul className="space-y-2">
+                      {resumeAnalysis.overallTips.map((tip, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-blue-700">
+                          <span className="font-bold flex-shrink-0">{i + 1}.</span>{tip}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
               </motion.div>
             )}

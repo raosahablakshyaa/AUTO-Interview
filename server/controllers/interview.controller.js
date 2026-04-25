@@ -20,33 +20,117 @@ const askAI = async (prompt) => {
   return res.choices[0].message.content;
 };
 
+export const replyToDoubt = async (req, res) => {
+  try {
+    const { doubt, language = "english", candidateName = "" } = req.body;
+    const langInstruction = language === "hindi"
+      ? "Reply in Hindi language only."
+      : language === "hinglish"
+      ? "Reply in Hinglish (mix of Hindi and English)."
+      : "Reply in English.";
+
+    const prompt = `You are a professional AI interviewer conducting a job interview${candidateName ? ` with ${candidateName}` : ""}. Before the interview starts, the candidate has asked you this question or doubt:
+
+"${doubt}"
+
+Reply naturally and helpfully as an interviewer would — answer their concern, reassure them if needed, and keep it brief (2-4 sentences max). ${langInstruction} Do NOT repeat their question back. Just give a direct, warm, helpful reply.`;
+
+    const reply = await askAI(prompt);
+    return res.status(200).json({ reply: reply.trim() });
+  } catch (error) {
+    console.log("REPLY DOUBT ERROR", error);
+    return res.status(500).json({ message: "Failed to generate reply" });
+  }
+};
+
 export const analyzeResume = async (req, res) => {
   try {
     const pdfBuffer = req.file.buffer;
     const pdfData = await pdfParse(pdfBuffer);
-    const resumeText = pdfData.text.slice(0, 3000);
+    const resumeText = pdfData.text.slice(0, 5000);
 
-    const prompt = `You are an expert HR recruiter and resume reviewer. Analyze this resume and give honest feedback.
+    const prompt = `You are a senior HR director, ATS expert, and career coach with 15+ years of experience reviewing resumes for top companies like Google, Amazon, and McKinsey. Analyze this resume with extreme detail and honesty.
 
 Resume:
 ${resumeText}
 
-Provide a JSON response with this exact structure:
+Perform a DEEP analysis covering every aspect. Return ONLY a valid JSON object with this exact structure (no markdown, no extra text):
 {
-  "score": <0-100>,
+  "score": <0-100, be strict and realistic>,
   "verdict": "good" | "average" | "poor",
-  "summary": "2-3 line overall summary",
-  "missingSection": ["section1", "section2"],
-  "weakPoints": ["weakness1", "weakness2", "weakness3"],
-  "strongPoints": ["strength1", "strength2", "strength3"],
-  "improvements": [
-    { "section": "section name", "tip": "what to improve and how" }
-  ],
+  "summary": "3-4 line honest overall assessment mentioning candidate's field, experience level, and readiness",
+
+  "sectionScores": {
+    "formatting": <0-100>,
+    "content": <0-100>,
+    "relevance": <0-100>,
+    "impact": <0-100>,
+    "brevity": <0-100>
+  },
+
   "atsScore": <0-100>,
-  "atsTips": ["tip1", "tip2", "tip3"]
+  "atsTips": [
+    "specific ATS tip 1",
+    "specific ATS tip 2",
+    "specific ATS tip 3",
+    "specific ATS tip 4",
+    "specific ATS tip 5"
+  ],
+
+  "strongPoints": [
+    "specific strength with example from resume",
+    "specific strength 2",
+    "specific strength 3",
+    "specific strength 4",
+    "specific strength 5"
+  ],
+
+  "weakPoints": [
+    "specific weakness with exact location in resume",
+    "specific weakness 2",
+    "specific weakness 3",
+    "specific weakness 4",
+    "specific weakness 5"
+  ],
+
+  "missingSection": ["list of important sections completely absent"],
+
+  "improvements": [
+    { "section": "section name", "priority": "high" | "medium" | "low", "tip": "very specific actionable tip with example of what to write" },
+    { "section": "section name", "priority": "high", "tip": "tip" },
+    { "section": "section name", "priority": "medium", "tip": "tip" },
+    { "section": "section name", "priority": "medium", "tip": "tip" },
+    { "section": "section name", "priority": "low", "tip": "tip" },
+    { "section": "section name", "priority": "low", "tip": "tip" }
+  ],
+
+  "bulletPointAnalysis": {
+    "hasMetrics": <true|false>,
+    "usesActionVerbs": <true|false>,
+    "feedback": "specific feedback on how bullet points are written and how to improve them with examples"
+  },
+
+  "keywordsFound": ["list of strong industry keywords found in resume"],
+  "keywordsMissing": ["important keywords missing for their target role that should be added"],
+
+  "experienceAnalysis": "detailed analysis of work experience section — quality of descriptions, impact shown, gaps if any",
+  "educationAnalysis": "analysis of education section",
+  "skillsAnalysis": "analysis of skills section — are they relevant, well-organized, missing anything important",
+
+  "overallTips": [
+    "high-impact tip 1 that will most improve this resume",
+    "high-impact tip 2",
+    "high-impact tip 3"
+  ]
 }
 
-Be very honest. If resume is poor, say so clearly.`;
+Rules:
+- Be brutally honest. Do NOT give inflated scores.
+- Every point must be SPECIFIC to this resume, not generic advice.
+- If bullet points lack numbers/metrics, say so with examples of how to rewrite them.
+- If the resume is 1 page for 5+ years experience, flag it.
+- Check for spelling/grammar issues and mention them.
+- Score 90+ only if the resume is truly exceptional.`;
 
     const text = await askAI(prompt);
     const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -61,7 +145,7 @@ Be very honest. If resume is poor, say so clearly.`;
 
 export const generateQuestions = async (req, res) => {
   try {
-    const { type, domain, targetCompany, language = "english", questionCount = 7 } = req.body;
+    const { type, domain, targetCompany, language = "english", questionCount = 7, credits = 10 } = req.body;
     const pdfBuffer = req.file.buffer;
 
     // Parse PDF
@@ -116,7 +200,7 @@ Return ONLY a JSON array of ${questionCount} question strings. Example: ["Questi
       status: "pending"
     });
 
-    await User.findByIdAndUpdate(req.userID, { $inc: { credits: -10 } });
+    await User.findByIdAndUpdate(req.userID, { $inc: { credits: -credits } });
 
     return res.status(200).json({ questions, interviewId: interview._id, candidateName, domain, targetCompany });
   } catch (error) {

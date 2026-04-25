@@ -57,7 +57,7 @@ function Result() {
   );
 
   return (
-    <div className="w-full min-h-screen bg-gray-50 py-10 px-6">
+    <div className="w-full min-h-screen bg-gray-50 py-8 sm:py-10 px-4 sm:px-6">
       <div className="max-w-4xl mx-auto">
 
         {/* Header */}
@@ -86,7 +86,7 @@ function Result() {
           <div className="space-y-6">
 
             {/* Score Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
               {[
                 { label: "Overall Score", value: result.overallScore, suffix: "%" },
                 { label: "Confidence", value: result.confidenceScore, suffix: "%" },
@@ -135,7 +135,7 @@ function Result() {
             </div>
 
             {/* Strong & Weak Topics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
                 <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
                   <MdCheckCircle className="text-green-500" /> Strong Topics
@@ -211,7 +211,7 @@ function Result() {
             </div>
 
             {/* Actions */}
-            <div className="flex gap-4">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
               <button
                 onClick={() => navigate("/upload-resume")}
                 className="flex-1 bg-black text-white py-3 rounded-xl font-medium hover:bg-gray-800 transition cursor-pointer"
