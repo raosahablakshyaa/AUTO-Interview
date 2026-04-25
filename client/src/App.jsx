@@ -10,7 +10,7 @@ import InterviewRoom from "./pages/InterviewRoom";
 import Result from "./pages/Result";
 import Profile from "./pages/Profile";
 
-export const ServerURL = "http://localhost:8000";
+export const ServerURL = import.meta.env.VITE_BACKEND_URL;
 
 function App() {
   const dispatch = useDispatch();
