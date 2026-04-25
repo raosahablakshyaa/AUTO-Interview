@@ -326,6 +326,7 @@ function InterviewRoom() {
         onDone?.();
       };
       utterance.onerror = (e) => {
+        if (e.error === "interrupted") return;
         console.error("Speech error:", e);
         setAiSpeaking(false);
         if (aiVideoRef.current) { aiVideoRef.current.pause(); aiVideoRef.current.currentTime = 0; }
