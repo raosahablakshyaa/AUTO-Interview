@@ -12,7 +12,7 @@ import maleAI from "../assets/Videos/male-ai.mp4";
 function InterviewRoom() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { questions = [], interviewId, candidateName = "", domain = "" } = location.state || {};
+  const { questions = [], interviewId, candidateName = "", domain = "", language = "english", timePerQ = 120 } = location.state || {};
 
   const isCodingQuestion = (q) => q?.startsWith("[CODE]");
   const cleanQuestion = (q) => q?.replace(/^\[CODE\]\s*/, "");
@@ -38,13 +38,15 @@ function InterviewRoom() {
   const [warnings, setWarnings] = useState([]);
   const [warningCount, setWarningCount] = useState(0);
   const [cameraOn, setCameraOn] = useState(true);
-  const [timeLeft, setTimeLeft] = useState(120);
-  const [phase, setPhase] = useState("intro");
+  const [timeLeft, setTimeLeft] = useState(timePerQ);
+  const [phase, setPhase] = useState("intro"); // intro | greeting | doubts | question | answering | finished
   const [aiGender] = useState(Math.random() > 0.5 ? "female" : "male");
   const [codeAnswer, setCodeAnswer] = useState("");
-  const [faceStatus, setFaceStatus] = useState("ok"); // ok | no-face | multiple
+  const [faceStatus, setFaceStatus] = useState("ok");
   const [isBlurred, setIsBlurred] = useState(false);
   const [warningAlert, setWarningAlert] = useState(null);
+  const [aiText, setAiText] = useState("");
+  const [nextTimeLimit, setNextTimeLimit] = useState(timePerQ); // what AI is currently saying
 
   // Keep answersRef in sync
   useEffect(() => { answersRef.current = answers; }, [answers]);
@@ -69,7 +71,7 @@ function InterviewRoom() {
         streamRef.current = stream;
         if (webcamRef.current) webcamRef.current.srcObject = stream;
         startRecording(stream);
-        startNoiseDetection(stream);
+    // Noise detection removed
       } catch (err) {
         addWarning("Camera/Mic access denied");
       }
@@ -217,15 +219,23 @@ function InterviewRoom() {
     return () => clearTimeout(t);
   }, [timeLeft, phase]);
 
-  // Start intro
+  // Start intro — professional greeting → doubts → questions
   useEffect(() => {
     if (questions.length === 0) { navigate("/upload-resume"); return; }
     if (sessionStorage.getItem("interviewDone") === interviewId) { navigate("/upload-resume", { replace: true }); return; }
+
+    const greet = language === "hindi"
+      ? (candidateName ? `नमस्ते ${candidateName} जी! मैं आज आपका इंटरव्यू लूंगा। मैंने आपका रेज़्यूमे ध्यान से पढ़ा है और मुझे कहना होगा, आपका प्रोफाइल काफी अच्छा है। आज हम एक professional interview session करेंगे। बस relax रहिए और naturally जवाब दीजिए। क्या आपका कोई सवाल है interview शुरू होने से पहले?`
+        : `नमस्ते! मैं आज आपका इंटरव्यू लूंगा। मैंने आपका रेज़्यूमे देखा है। क्या आपका कोई सवाल है शुरू होने से पहले?`)
+      : language === "hinglish"
+      ? (candidateName ? `Hello ${candidateName} ji! Main aaj aapka interviewer hoon. Maine aapka resume carefully padha hai aur mujhe kehna hoga, aapka profile kaafi accha hai. Aaj hum ek professional interview session karenge. Bas relax rahiye aur naturally jawab dijiye. Kya aapka koi sawaal hai interview shuru hone se pehle?`
+        : `Hello! Main aaj aapka interviewer hoon. Maine aapka resume dekha hai. Kya aapka koi sawaal hai shuru hone se pehle?`)
+      : (candidateName ? `Hello ${candidateName}! I'll be conducting your interview today. I've carefully gone through your resume and I must say, your profile looks quite impressive. We'll have a professional interview session today — just be yourself and answer naturally. Before we begin, do you have any questions for me?`
+        : `Hello! I'll be conducting your interview today. I've gone through your resume. Before we begin, do you have any questions for me?`);
+
     setTimeout(() => {
-      const intro = candidateName
-        ? `Hello ${candidateName}, welcome to your AI interview. I have reviewed your resume and prepared some questions for you. Please ensure you are alone, your face is clearly visible, and you do not switch tabs or applications. Let's begin.`
-        : `Welcome to your AI interview. Please ensure you are alone, your face is clearly visible, and you do not switch tabs. Let's begin.`;
-      speakAI(intro, () => { setPhase("question"); askQuestion(0); });
+      setPhase("greeting");
+      speakAI(greet, () => setPhase("doubts"));
     }, 1000);
   }, []);
 
@@ -279,6 +289,7 @@ function InterviewRoom() {
 
   const speakAI = (text, onDone) => {
     window.speechSynthesis.cancel();
+    setAiText(text);
 
     const doSpeak = () => {
       const voices = window.speechSynthesis.getVoices();
@@ -295,10 +306,7 @@ function InterviewRoom() {
       utterance.volume = 1;
       if (preferred) utterance.voice = preferred;
 
-      utterance.onstart = () => {
-        setAiSpeaking(true);
-        aiVideoRef.current?.play();
-      };
+      utterance.onstart = () => { setAiSpeaking(true); aiVideoRef.current?.play(); };
       utterance.onend = () => {
         setAiSpeaking(false);
         if (aiVideoRef.current) { aiVideoRef.current.pause(); aiVideoRef.current.currentTime = 0; }
@@ -310,15 +318,13 @@ function InterviewRoom() {
         if (aiVideoRef.current) { aiVideoRef.current.pause(); aiVideoRef.current.currentTime = 0; }
         onDone?.();
       };
-
       window.speechSynthesis.speak(utterance);
     };
 
     setTimeout(() => {
       const voices = window.speechSynthesis.getVoices();
-      if (voices.length > 0) {
-        doSpeak();
-      } else {
+      if (voices.length > 0) doSpeak();
+      else {
         window.speechSynthesis.onvoiceschanged = () => {
           window.speechSynthesis.onvoiceschanged = null;
           doSpeak();
@@ -327,13 +333,55 @@ function InterviewRoom() {
     }, 200);
   };
 
-  const askQuestion = (index) => {
+  const handleNoDoubts = () => {
+    const msg = language === "hindi"
+      ? "Bilkul theek hai! Toh chaliye shuru karte hain. Dhyaan se suniye aur soch samajh kar jawab dijiye."
+      : language === "hinglish"
+      ? "Perfect! Toh chaliye shuru karte hain. Dhyaan se suniye aur naturally answer kijiye."
+      : "Perfect! No worries at all. Alright then, let's get started. Listen carefully and take your time with each answer.";
+    speakAI(msg, () => { setPhase("question"); askQuestion(0); });
+  };
+
+  const questionPrefixes = language === "hindi"
+    ? [
+        "अच्छा, पहला सवाल — ",
+        "ठीक है, अगला सवाल — ",
+        "अब यह बताइए — ",
+        "दिलचस्प, अब यह पूछना चाहता हूं — ",
+        "अच्छा, एक और — ",
+        "चलिए आगे बढ़ते हैं — ",
+        "बस अंतिम सवाल — ",
+      ]
+    : language === "hinglish"
+    ? [
+        "Achha, pehla question — ",
+        "Theek hai, agli baat — ",
+        "Ab yeh batao — ",
+        "Interesting, ab yeh puchna chahta hoon — ",
+        "Achha, ek aur — ",
+        "Chaliye aage badhte hain — ",
+        "Bas ek aakhri sawaal — ",
+      ]
+    : [
+        "Alright, here's my first question for you — ",
+        "Great, moving on — ",
+        "Okay, next one — ",
+        "Interesting, now let me ask you — ",
+        "Good, here's another one — ",
+        "Alright, let's go a bit deeper — ",
+        "Almost there, just a couple more — ",
+      ];
+
+  const askQuestion = (index, customTime) => {
     if (index >= questions.length) { finishInterview(); return; }
     setPhase("question");
-    setTimeLeft(120);
+    const t = customTime || timePerQ;
+    setTimeLeft(t);
+    setNextTimeLimit(t);
     setTranscript("");
     setCodeAnswer("");
-    speakAI(cleanQuestion(questions[index]), () => setPhase("answering"));
+    const prefix = index === 0 ? "So, here's my first question — " : questionPrefixes[index] || "Next question — ";
+    speakAI(prefix + cleanQuestion(questions[index]), () => setPhase("answering"));
   };
 
   const startListening = () => {
@@ -359,21 +407,38 @@ function InterviewRoom() {
   const handleNextQuestion = () => {
     stopListening();
     const finalAnswer = isCodingQuestion(questions[currentQ]) ? codeAnswer || transcript : transcript;
-    const newAnswers = [...answersRef.current, { question: cleanQuestion(questions[currentQ]), answer: finalAnswer, timeSpent: 120 - timeLeft, isCoding: isCodingQuestion(questions[currentQ]) }];
+    const timeSpent = timePerQ - timeLeft;
+    const timeRemaining = timeLeft;
+    const newAnswers = [...answersRef.current, { question: cleanQuestion(questions[currentQ]), answer: finalAnswer, timeSpent, isCoding: isCodingQuestion(questions[currentQ]) }];
     setAnswers(newAnswers);
     answersRef.current = newAnswers;
     const next = currentQ + 1;
     if (next >= questions.length) { finishInterview(); return; }
+
+    // Distribute remaining time to next question
+    const questionsLeft = questions.length - next;
+    const bonusPerQ = Math.floor(timeRemaining / questionsLeft);
+    const nextTimeLimit = Math.min(timePerQ + bonusPerQ, timePerQ * 2); // max 2x original time
+    setNextTimeLimit(nextTimeLimit);
+
     setCurrentQ(next);
-    askQuestion(next);
+    askQuestion(next, nextTimeLimit);
   };
 
   const finishInterview = () => {
     setPhase("finished");
-    setTimeout(() => stopMedia(), 2000);
-    document.exitFullscreen?.();
-    sessionStorage.setItem("interviewDone", interviewId);
-    navigate("/result", { state: { answers: answersRef.current, interviewId, warningCount: warningCountRef.current }, replace: true });
+    const closing = language === "hindi"
+      ? "Bahut shukriya! Aapne aaj bahut accha kiya. Mujhe aapke saath baat karke bahut accha laga. Main ab aapke jawaabon ka vishleshan karunga aur ek detailed feedback report taiyaar karunga. Kripya result ka intezaar karein."
+      : language === "hinglish"
+      ? "Bahut bahut shukriya! Aapne aaj really well kiya. Mujhe aapke saath baat karke bahut accha laga. Main ab aapke answers analyze karunga aur ek detailed feedback report taiyaar karunga. Please result ka wait karein."
+      : "Thank you so much for your time today! It was a genuine pleasure speaking with you. You did really well. I'll now analyze your responses and prepare a detailed feedback report for you. Please wait for your results.";
+    speakAI(closing);
+    setTimeout(() => {
+      stopMedia();
+      document.exitFullscreen?.();
+      sessionStorage.setItem("interviewDone", interviewId);
+      navigate("/result", { state: { answers: answersRef.current, interviewId, warningCount: warningCountRef.current }, replace: true });
+    }, 2000);
   };
 
   const formatTime = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -422,8 +487,9 @@ function InterviewRoom() {
         </div>
         <div className="flex items-center gap-4">
           {phase === "answering" && (
-            <div className={`px-3 py-1 rounded-full text-sm font-mono font-bold ${timeLeft < 30 ? "bg-red-500" : "bg-gray-700"}`}>
+            <div className={`px-3 py-1 rounded-full text-sm font-mono font-bold ${timeLeft < 30 ? "bg-red-500" : nextTimeLimit > timePerQ ? "bg-green-600" : "bg-gray-700"}`}>
               {formatTime(timeLeft)}
+              {nextTimeLimit > timePerQ && <span className="text-xs ml-1 opacity-80">+bonus</span>}
             </div>
           )}
           <div className="text-sm text-gray-400">Q {currentQ + 1}/{questions.length}</div>
@@ -466,6 +532,12 @@ function InterviewRoom() {
             <div className="absolute bottom-4 left-4 bg-black/60 px-3 py-1 rounded-full text-sm">
               AI Interviewer {aiSpeaking && <span className="ml-1 text-green-400">● Speaking</span>}
             </div>
+            {/* AI speech text */}
+            {aiText && (
+              <div className="absolute bottom-12 left-4 right-4 bg-black/70 px-4 py-2 rounded-xl text-sm text-white">
+                {aiText}
+              </div>
+            )}
           </div>
 
           {/* Question */}
@@ -562,6 +634,18 @@ function InterviewRoom() {
                 <p key={i} className="text-red-300 text-xs">{w.time}: {w.msg}</p>
               ))}
             </div>
+          )}
+
+          {/* Doubts phase — No doubts button */}
+          {phase === "doubts" && (
+            <motion.button
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              onClick={handleNoDoubts}
+              className="w-full bg-white text-black py-3 rounded-xl font-medium hover:bg-gray-200 transition cursor-pointer"
+            >
+              {language === "hindi" ? "कोई सवाल नहीं, शुरू करें →" : language === "hinglish" ? "Koi sawaal nahi, shuru karein →" : "No doubts, let's begin →"}
+            </motion.button>
           )}
 
           {/* Next Button */}

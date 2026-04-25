@@ -13,63 +13,17 @@ const interviewTypes = [
   { id: "mixed", label: "Mixed", icon: "🎯" },
 ];
 
-const domains = [
-  { id: "", label: "General / Not Specified" },
-  { id: "web development", label: "🌐 Web Development" },
-  { id: "generative AI", label: "🤖 Generative AI" },
-  { id: "data analytics", label: "📊 Data Analytics" },
-  { id: "machine learning", label: "🧠 Machine Learning" },
-  { id: "mobile development", label: "📱 Mobile Development" },
-  { id: "devops", label: "⚙️ DevOps / Cloud" },
-  { id: "cybersecurity", label: "🔐 Cybersecurity" },
+const languages = [
+  { id: "english", label: "🇬🇧 English" },
+  { id: "hindi", label: "🇮🇳 Hindi" },
+  { id: "hinglish", label: "🔀 Hinglish" },
 ];
 
-const companyGroups = [
-  {
-    group: "FAANG / Big Tech",
-    companies: [
-      { id: "Google", label: "🔵 Google" },
-      { id: "Microsoft", label: "🪟 Microsoft" },
-      { id: "Amazon", label: "🟠 Amazon" },
-      { id: "Apple", label: "🍎 Apple" },
-      { id: "Meta", label: "🔷 Meta" },
-      { id: "Netflix", label: "🔴 Netflix" },
-    ]
-  },
-  {
-    group: "Top Product-Based",
-    companies: [
-      { id: "Adobe", label: "🔴 Adobe" },
-      { id: "Salesforce", label: "☁️ Salesforce" },
-      { id: "Uber", label: "⚫ Uber" },
-      { id: "Airbnb", label: "🏠 Airbnb" },
-      { id: "Atlassian", label: "🔵 Atlassian" },
-      { id: "Oracle", label: "🔴 Oracle" },
-      { id: "SAP", label: "🟦 SAP" },
-      { id: "NVIDIA", label: "🟢 NVIDIA" },
-    ]
-  },
-  {
-    group: "AI / High-Growth",
-    companies: [
-      { id: "OpenAI", label: "🤖 OpenAI" },
-      { id: "Anthropic", label: "🧠 Anthropic" },
-      { id: "DeepMind", label: "💡 DeepMind" },
-      { id: "Tesla", label: "⚡ Tesla" },
-      { id: "SpaceX", label: "🚀 SpaceX" },
-    ]
-  },
-  {
-    group: "India Dream Companies",
-    companies: [
-      { id: "Flipkart", label: "🛒 Flipkart" },
-      { id: "Zomato", label: "🍕 Zomato" },
-      { id: "Swiggy", label: "🛵 Swiggy" },
-      { id: "CRED", label: "💳 CRED" },
-      { id: "Razorpay", label: "💰 Razorpay" },
-      { id: "PhonePe", label: "📱 PhonePe" },
-    ]
-  }
+const durations = [
+  { id: 15, label: "15 min", questions: 3, timePerQ: 180 },
+  { id: 30, label: "30 min", questions: 5, timePerQ: 240 },
+  { id: 45, label: "45 min", questions: 7, timePerQ: 300 },
+  { id: 60, label: "60 min", questions: 10, timePerQ: 300 },
 ];
 
 function UploadResume() {
@@ -77,8 +31,8 @@ function UploadResume() {
   const { user } = useSelector((state) => state.user);
   const [file, setFile] = useState(null);
   const [type, setType] = useState("mixed");
-  const [domain, setDomain] = useState("");
-  const [targetCompany, setTargetCompany] = useState("");
+  const [language, setLanguage] = useState("english");
+  const [duration, setDuration] = useState(30);
   const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState("");
@@ -124,13 +78,14 @@ function UploadResume() {
       const formData = new FormData();
       formData.append("resume", file);
       formData.append("type", type);
-      formData.append("domain", domain);
-      formData.append("targetCompany", targetCompany);
+      formData.append("language", language);
+      const selectedDuration = durations.find(d => d.id === duration);
+      formData.append("questionCount", selectedDuration.questions);
       const res = await axios.post(`${ServerURL}/api/interview/generate`, formData, {
         withCredentials: true,
         headers: { "Content-Type": "multipart/form-data" }
       });
-      navigate("/interview", { state: { questions: res.data.questions, interviewId: res.data.interviewId, candidateName: res.data.candidateName, domain: res.data.domain, targetCompany: res.data.targetCompany } });
+      navigate("/interview", { state: { questions: res.data.questions, interviewId: res.data.interviewId, candidateName: res.data.candidateName, language, timePerQ: selectedDuration.timePerQ } });
     } catch (err) {
       setError(err.response?.data?.message || "Failed to generate questions");
     } finally {
@@ -232,41 +187,43 @@ function UploadResume() {
 
             {resumeAnalysis && (
               <div className="mb-4">
-                <p className="text-sm font-medium text-gray-700 mb-3">Your Domain / Specialization</p>
-                <select
-                  value={domain}
-                  onChange={(e) => setDomain(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 bg-white focus:outline-none focus:border-gray-400 cursor-pointer"
-                >
-                  {domains.map((d) => (
-                    <option key={d.id} value={d.id}>{d.label}</option>
+                <p className="text-sm font-medium text-gray-700 mb-3">Interview Language</p>
+                <div className="flex gap-3">
+                  {languages.map((l) => (
+                    <button
+                      key={l.id}
+                      onClick={() => setLanguage(l.id)}
+                      className={`flex-1 py-2 rounded-xl border text-sm font-medium transition cursor-pointer ${language === l.id ? "bg-black text-white border-black" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"}`}
+                    >
+                      {l.label}
+                    </button>
                   ))}
-                </select>
+                </div>
               </div>
             )}
 
             {resumeAnalysis && (
               <div className="mb-4">
-                <p className="text-sm font-medium text-gray-700 mb-2">Target Company <span className="text-gray-400 font-normal">(optional)</span></p>
-                <select
-                  value={targetCompany}
-                  onChange={(e) => setTargetCompany(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 bg-white focus:outline-none focus:border-gray-400 cursor-pointer"
-                >
-                  <option value="">No specific company</option>
-                  {companyGroups.map((g) => (
-                    <optgroup key={g.group} label={g.group}>
-                      {g.companies.map((c) => (
-                        <option key={c.id} value={c.id}>{c.label}</option>
-                      ))}
-                    </optgroup>
+                <p className="text-sm font-medium text-gray-700 mb-1">⏱️ How much time do you have?</p>
+                <p className="text-xs text-gray-400 mb-3">We'll schedule your interview accordingly</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {durations.map((d) => (
+                    <button
+                      key={d.id}
+                      onClick={() => setDuration(d.id)}
+                      className={`py-3 rounded-xl border text-sm font-medium transition cursor-pointer flex flex-col items-center gap-0.5 ${
+                        duration === d.id ? "bg-black text-white border-black" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
+                      }`}
+                    >
+                      <span className="font-bold">{d.label}</span>
+                      <span className={`text-xs ${duration === d.id ? "text-gray-300" : "text-gray-400"}`}>{d.questions} questions</span>
+                    </button>
                   ))}
-                </select>
-                {targetCompany && (
-                  <p className="text-xs text-blue-600 mt-1.5">✓ Questions will include {targetCompany} PYQs style</p>
-                )}
+                </div>
               </div>
             )}
+
+
 
             {/* Start Interview Button */}
             <button

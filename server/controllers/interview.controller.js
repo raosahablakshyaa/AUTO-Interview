@@ -61,7 +61,7 @@ Be very honest. If resume is poor, say so clearly.`;
 
 export const generateQuestions = async (req, res) => {
   try {
-    const { type, domain, targetCompany } = req.body;
+    const { type, domain, targetCompany, language = "english", questionCount = 7 } = req.body;
     const pdfBuffer = req.file.buffer;
 
     // Parse PDF
@@ -82,30 +82,27 @@ export const generateQuestions = async (req, res) => {
     // Save resume and name to user profile
     await User.findByIdAndUpdate(req.userID, { resumeText, candidateName });
 
-    // Generate questions with Groq
-    const domainContext = domain ? `The candidate specializes in ${domain}. Ask deep domain-specific questions about ${domain}.` : "";
-    const companyContext = targetCompany ? `The candidate is preparing for ${targetCompany}. Ask questions in the style of ${targetCompany}'s actual interview process — include their commonly asked previous year questions (PYQs), their specific tech stack, culture, and problem-solving style. For example: ${targetCompany === "Google" ? "focus on algorithms, system design, and scalability" : targetCompany === "Amazon" ? "include Leadership Principles behavioral questions and system design" : targetCompany === "Microsoft" ? "focus on OOP, system design, and problem solving" : targetCompany === "Meta" ? "focus on product sense, algorithms, and distributed systems" : targetCompany === "Apple" ? "focus on software quality, performance optimization, and user experience" : targetCompany === "Netflix" ? "focus on culture fit, system design at scale, and streaming tech" : targetCompany === "OpenAI" || targetCompany === "Anthropic" || targetCompany === "DeepMind" ? "focus on ML fundamentals, LLMs, research thinking, and AI safety" : targetCompany === "Tesla" || targetCompany === "SpaceX" ? "focus on engineering fundamentals, real-time systems, and problem solving under constraints" : `focus on ${targetCompany}'s known interview style and tech stack`}.` : "";
-    const codingInstruction = domain && domain !== "hr" ? `
-- Include 2-3 coding/technical questions specific to ${domain}
-- For each coding question, add a prefix "[CODE]" at the start so it's identified as a coding question
-- Coding questions should test practical implementation skills` : "";
+    const languageInstruction = language === "hindi"
+      ? "Generate all questions in Hindi language."
+      : language === "hinglish"
+      ? "Generate all questions in Hinglish (mix of Hindi and English)."
+      : "Generate all questions in English.";
 
-    const prompt = `You are an expert interviewer. Based on this resume, generate 7 ${type} interview questions.
-${domainContext}
-${companyContext}
+    const prompt = `You are an expert interviewer. Based on this resume, generate ${questionCount} ${type} interview questions.
+${languageInstruction}
 
 Resume:
 ${resumeText}${previousQContext}
 
 Rules:
-- Questions should be specific to the candidate's experience and domain
+- Questions should be specific to the candidate's experience
 - Mix easy, medium and hard questions
-- For technical: focus on skills mentioned in resume and ${domain || "general tech"}
+- For technical: focus on skills mentioned in resume
 - For HR: focus on behavior, teamwork, goals
-- For mixed: combine both technical and HR${codingInstruction}
-${targetCompany ? `- Include at least 2-3 questions that reflect ${targetCompany}'s actual interview style or known PYQs` : ""}
+- For mixed: combine both technical and HR
+- Include coding questions prefixed with [CODE] if technical/mixed
 
-Return ONLY a JSON array of 7 question strings. Example: ["Question 1?", "[CODE] Write a function to..."]`;
+Return ONLY a JSON array of ${questionCount} question strings. Example: ["Question 1?", "[CODE] Write a function to..."]`;
 
     const text = await askAI(prompt);
     const jsonMatch = text.match(/\[[\s\S]*\]/);
