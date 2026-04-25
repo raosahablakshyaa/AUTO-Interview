@@ -219,10 +219,14 @@ function InterviewRoom() {
     return () => clearTimeout(t);
   }, [timeLeft, phase]);
 
+  const introSpoken = useRef(false);
+
   // Start intro — professional greeting → doubts → questions
   useEffect(() => {
     if (questions.length === 0) { navigate("/upload-resume"); return; }
     if (sessionStorage.getItem("interviewDone") === interviewId) { navigate("/upload-resume", { replace: true }); return; }
+    if (introSpoken.current) return;
+    introSpoken.current = true;
 
     const greet = language === "hindi"
       ? (candidateName ? `नमस्ते ${candidateName} जी! मैं आज आपका इंटरव्यू लूंगा। मैंने आपका रेज़्यूमे ध्यान से पढ़ा है और मुझे कहना होगा, आपका प्रोफाइल काफी अच्छा है। आज हम एक professional interview session करेंगे। बस relax रहिए और naturally जवाब दीजिए। क्या आपका कोई सवाल है interview शुरू होने से पहले?`
@@ -293,18 +297,26 @@ function InterviewRoom() {
 
     const doSpeak = () => {
       const voices = window.speechSynthesis.getVoices();
-      const enVoices = voices.filter(v => v.lang.startsWith("en"));
-      const preferred = enVoices.find(v =>
-        aiGender === "female"
-          ? v.name.includes("Samantha") || v.name.includes("Google UK English Female") || v.name.includes("Zira") || v.name.includes("Susan")
-          : v.name.includes("Daniel") || v.name.includes("Google UK English Male") || v.name.includes("David") || v.name.includes("Mark")
-      ) || enVoices[0] || voices[0];
+
+      let preferred;
+      if (language === "hindi") {
+        preferred = voices.find(v => v.lang === "hi-IN") ||
+          voices.find(v => v.lang.startsWith("hi"));
+      } else {
+        const enVoices = voices.filter(v => v.lang.startsWith("en"));
+        preferred = enVoices.find(v =>
+          aiGender === "female"
+            ? v.name.includes("Samantha") || v.name.includes("Google UK English Female") || v.name.includes("Zira")
+            : v.name.includes("Daniel") || v.name.includes("Google UK English Male") || v.name.includes("David")
+        ) || enVoices.find(v => v.name.includes("Google")) || enVoices[0];
+      }
+      if (!preferred) preferred = voices[0];
 
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.85;
-      utterance.pitch = aiGender === "female" ? 1.05 : 0.95;
+      utterance.rate = language === "hindi" ? 1.0 : 1.15;
+      utterance.pitch = language === "hindi" ? 1.0 : (aiGender === "female" ? 1.05 : 0.95);
       utterance.volume = 1;
-      if (preferred) utterance.voice = preferred;
+      utterance.voice = preferred;
 
       utterance.onstart = () => { setAiSpeaking(true); aiVideoRef.current?.play(); };
       utterance.onend = () => {
