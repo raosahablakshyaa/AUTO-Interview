@@ -11,6 +11,10 @@ dotenv.config();
 const app = express();
 
 app.use(cors({ origin: ["http://localhost:5173", "https://auto-interview-psi.vercel.app"], credentials: true }));
+app.use((req, res, next) => {
+  res.setHeader("Cross-Origin-Opener-Policy", "unsafe-none");
+  next();
+});
 app.use(express.json());
 app.use(cookieParser());
 
