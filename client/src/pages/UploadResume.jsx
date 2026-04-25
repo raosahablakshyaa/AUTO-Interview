@@ -243,7 +243,7 @@ function UploadResume() {
             {resumeAnalysis && (
               <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="flex-1 space-y-4">
 
-                {/* Verdict */}
+                {/* Verdict + Score */}
                 {(() => { const config = getVerdictConfig(resumeAnalysis.verdict); return (
                   <div className={`rounded-2xl border p-5 ${config.color}`}>
                     <div className="flex items-center gap-2 mb-2">
@@ -255,22 +255,53 @@ function UploadResume() {
                   </div>
                 ); })()}
 
-                {/* Section Scores */}
+                {/* Section-by-Section Scores */}
                 {resumeAnalysis.sectionScores && (
                   <div className="bg-white rounded-2xl border border-gray-200 p-5">
-                    <h3 className="font-semibold text-gray-800 mb-4">Section Scores</h3>
-                    {Object.entries(resumeAnalysis.sectionScores).map(([key, val], i) => (
-                      <div key={i} className="mb-3">
-                        <div className="flex justify-between text-sm mb-1">
-                          <span className="text-gray-600 capitalize">{key}</span>
-                          <span className={`font-semibold ${getScoreColor(val)}`}>{val}%</span>
-                        </div>
-                        <div className="w-full bg-gray-100 rounded-full h-1.5">
-                          <motion.div initial={{ width: 0 }} animate={{ width: `${val}%` }} transition={{ duration: 0.7, delay: i * 0.1 }}
-                            className={`h-1.5 rounded-full ${val >= 70 ? "bg-green-500" : val >= 50 ? "bg-yellow-500" : "bg-red-500"}`} />
-                        </div>
-                      </div>
-                    ))}
+                    <h3 className="font-semibold text-gray-800 mb-4">Section Wise Breakdown</h3>
+                    <div className="space-y-4">
+                      {Object.entries(resumeAnalysis.sectionScores).map(([key, val], i) => {
+                        const pct = Math.round((val.score / val.max) * 100);
+                        const label = key.replace(/([A-Z])/g, " $1").replace(/^./, s => s.toUpperCase());
+                        return (
+                          <div key={i} className="border border-gray-100 rounded-xl p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-semibold text-gray-800">{label}</span>
+                              <span className={`text-sm font-bold ${getScoreColor(pct)}`}>{val.score}/{val.max}</span>
+                            </div>
+                            <div className="w-full bg-gray-100 rounded-full h-1.5 mb-3">
+                              <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.7, delay: i * 0.08 }}
+                                className={`h-1.5 rounded-full ${pct >= 70 ? "bg-green-500" : pct >= 40 ? "bg-yellow-500" : "bg-red-500"}`} />
+                            </div>
+                            <p className="text-xs text-gray-600 mb-2">{val.feedback}</p>
+                            {val.missing?.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {val.missing.map((m, j) => <span key={j} className="bg-red-50 text-red-600 text-xs px-2 py-0.5 rounded-full">Missing: {m}</span>)}
+                              </div>
+                            )}
+                            {val.issues?.length > 0 && (
+                              <ul className="mt-2 space-y-1">
+                                {val.issues.map((iss, j) => <li key={j} className="text-xs text-red-600 flex items-start gap-1"><span className="flex-shrink-0">•</span>{iss}</li>)}
+                              </ul>
+                            )}
+                            {val.rewrite && (
+                              <div className="mt-2 bg-blue-50 rounded-lg p-3">
+                                <p className="text-xs text-blue-600 font-medium mb-1">✏️ Suggested Rewrite:</p>
+                                <p className="text-xs text-blue-700">{val.rewrite}</p>
+                              </div>
+                            )}
+                            {val.suggestions?.length > 0 && (
+                              <div className="mt-2">
+                                <p className="text-xs text-gray-500 font-medium mb-1">Suggested certifications:</p>
+                                <div className="flex flex-wrap gap-1">
+                                  {val.suggestions.map((s, j) => <span key={j} className="bg-purple-50 text-purple-700 text-xs px-2 py-0.5 rounded-full">{s}</span>)}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 
@@ -382,17 +413,18 @@ function UploadResume() {
 
                 {/* Improvements */}
                 <div className="bg-white rounded-2xl border border-gray-200 p-5">
-                  <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2"><MdTrendingUp className="text-blue-500" /> Improvement Plan</h3>
-                  <ul className="space-y-3">
+                  <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2"><MdTrendingUp className="text-blue-500" /> Fix Your Resume</h3>
+                  <ul className="space-y-4">
                     {resumeAnalysis.improvements?.map((item, i) => (
-                      <li key={i} className="flex items-start gap-3">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold flex-shrink-0 mt-0.5 ${
-                          item.priority === "high" ? "bg-red-100 text-red-600" : item.priority === "medium" ? "bg-yellow-100 text-yellow-600" : "bg-gray-100 text-gray-500"
-                        }`}>{item.priority?.toUpperCase() || i + 1}</span>
-                        <div>
-                          <span className="text-sm font-medium text-gray-800">{item.section}: </span>
-                          <span className="text-sm text-gray-600">{item.tip}</span>
+                      <li key={i} className="border border-gray-100 rounded-xl p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                            item.priority === "high" ? "bg-red-100 text-red-600" : item.priority === "medium" ? "bg-yellow-100 text-yellow-600" : "bg-gray-100 text-gray-500"
+                          }`}>{item.priority?.toUpperCase()}</span>
+                          <span className="text-sm font-semibold text-gray-800">{item.section}</span>
                         </div>
+                        {item.issue && <p className="text-xs text-red-600 mb-2">⚠ {item.issue}</p>}
+                        <p className="text-sm text-gray-600">✏ {item.tip}</p>
                       </li>
                     ))}
                   </ul>
@@ -401,7 +433,7 @@ function UploadResume() {
                 {/* Overall Tips */}
                 {resumeAnalysis.overallTips?.length > 0 && (
                   <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5">
-                    <h3 className="font-semibold text-blue-800 mb-3 flex items-center gap-2"><MdLightbulb className="text-blue-500" /> Top 3 High-Impact Tips</h3>
+                    <h3 className="font-semibold text-blue-800 mb-3 flex items-center gap-2"><MdLightbulb className="text-blue-500" /> Top 3 High-Impact Changes</h3>
                     <ul className="space-y-2">
                       {resumeAnalysis.overallTips.map((tip, i) => (
                         <li key={i} className="flex items-start gap-2 text-sm text-blue-700">

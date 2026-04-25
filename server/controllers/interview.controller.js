@@ -47,90 +47,86 @@ export const analyzeResume = async (req, res) => {
   try {
     const pdfBuffer = req.file.buffer;
     const pdfData = await pdfParse(pdfBuffer);
-    const resumeText = pdfData.text.slice(0, 5000);
+    const resumeText = pdfData.text.slice(0, 6000);
 
-    const prompt = `You are a senior HR director, ATS expert, and career coach with 15+ years of experience reviewing resumes for top companies like Google, Amazon, and McKinsey. Analyze this resume with extreme detail and honesty.
+    const prompt = `You are the world's most advanced resume scoring AI, trained on 10 million resumes and hiring data from Google, Amazon, Microsoft, McKinsey, and top startups. You score resumes like a strict ATS + senior recruiter combined.
 
-Resume:
+Resume Text:
 ${resumeText}
 
-Perform a DEEP analysis covering every aspect. Return ONLY a valid JSON object with this exact structure (no markdown, no extra text):
+Perform a DEEP, SPECIFIC, SECTION-BY-SECTION analysis. Return ONLY valid JSON, no markdown, no extra text.
+
+Scoring Breakdown (total 100 points):
+- Basic Details: 10 pts (name, email, phone, LinkedIn, GitHub)
+- Professional Summary: 10 pts (clarity, relevance, keywords, length)
+- Education: 10 pts (degree, institution, year, GPA if applicable)
+- Experience: 25 pts (roles, impact metrics, action verbs, relevance)
+- Projects: 20 pts (tech stack mentioned, outcomes, bullet points, links)
+- Certifications: 7.5 pts
+- Skills: 10 pts (categorized, relevant, not bloated)
+- Formatting & ATS: 7.5 pts (single column, standard fonts, no tables/images, proper headings)
+
+JSON structure to return:
 {
-  "score": <0-100, be strict and realistic>,
+  "score": <0-100, calculated from section scores>,
   "verdict": "good" | "average" | "poor",
-  "summary": "3-4 line honest overall assessment mentioning candidate's field, experience level, and readiness",
+  "summary": "3-4 sentence honest assessment mentioning candidate name, field, experience level, biggest strength and biggest gap",
 
   "sectionScores": {
-    "formatting": <0-100>,
-    "content": <0-100>,
-    "relevance": <0-100>,
-    "impact": <0-100>,
-    "brevity": <0-100>
+    "basicDetails": { "score": <0-10>, "max": 10, "feedback": "specific feedback", "missing": ["list of missing items like LinkedIn, GitHub etc"] },
+    "professionalSummary": { "score": <0-10>, "max": 10, "feedback": "specific feedback on their actual summary", "rewrite": "rewrite their summary better using their own info from resume" },
+    "education": { "score": <0-10>, "max": 10, "feedback": "specific feedback", "missing": ["GPA if not mentioned", "relevant coursework"] },
+    "experience": { "score": <0-25>, "max": 25, "feedback": "specific feedback — if no experience say so clearly and give exact tips", "issues": ["list of specific issues found"] },
+    "projects": { "score": <0-20>, "max": 20, "feedback": "specific feedback on each project found", "issues": ["list of specific issues"] },
+    "certifications": { "score": <0-7.5>, "max": 7.5, "feedback": "specific feedback", "suggestions": ["suggest 3 specific certifications relevant to their skills"] },
+    "skills": { "score": <0-10>, "max": 10, "feedback": "specific feedback on their skills section", "bloated": ["skills that seem irrelevant or too generic"], "missing": ["important skills missing based on their profile"] },
+    "formatting": { "score": <0-7.5>, "max": 7.5, "feedback": "specific formatting feedback", "issues": ["list of formatting issues"] }
   },
 
   "atsScore": <0-100>,
-  "atsTips": [
-    "specific ATS tip 1",
-    "specific ATS tip 2",
-    "specific ATS tip 3",
-    "specific ATS tip 4",
-    "specific ATS tip 5"
-  ],
-
-  "strongPoints": [
-    "specific strength with example from resume",
-    "specific strength 2",
-    "specific strength 3",
-    "specific strength 4",
-    "specific strength 5"
-  ],
-
-  "weakPoints": [
-    "specific weakness with exact location in resume",
-    "specific weakness 2",
-    "specific weakness 3",
-    "specific weakness 4",
-    "specific weakness 5"
-  ],
-
-  "missingSection": ["list of important sections completely absent"],
-
-  "improvements": [
-    { "section": "section name", "priority": "high" | "medium" | "low", "tip": "very specific actionable tip with example of what to write" },
-    { "section": "section name", "priority": "high", "tip": "tip" },
-    { "section": "section name", "priority": "medium", "tip": "tip" },
-    { "section": "section name", "priority": "medium", "tip": "tip" },
-    { "section": "section name", "priority": "low", "tip": "tip" },
-    { "section": "section name", "priority": "low", "tip": "tip" }
-  ],
+  "atsTips": ["5 specific ATS tips based on this resume"],
 
   "bulletPointAnalysis": {
     "hasMetrics": <true|false>,
     "usesActionVerbs": <true|false>,
-    "feedback": "specific feedback on how bullet points are written and how to improve them with examples"
+    "feedback": "specific feedback with example of how to rewrite one of their actual bullet points with metrics"
   },
 
-  "keywordsFound": ["list of strong industry keywords found in resume"],
-  "keywordsMissing": ["important keywords missing for their target role that should be added"],
+  "strongPoints": ["5 specific strengths with reference to actual content in resume"],
+  "weakPoints": ["5 specific weaknesses with exact location — e.g. 'Project AutoMind AI has no tech stack mentioned'"],
 
-  "experienceAnalysis": "detailed analysis of work experience section — quality of descriptions, impact shown, gaps if any",
-  "educationAnalysis": "analysis of education section",
-  "skillsAnalysis": "analysis of skills section — are they relevant, well-organized, missing anything important",
+  "keywordsFound": ["strong keywords found in resume relevant to their field"],
+  "keywordsMissing": ["10 important keywords missing that recruiters search for in their domain"],
+
+  "experienceAnalysis": "detailed analysis — if no experience, give specific advice on what internships/freelance/open source to add and how to frame them",
+  "educationAnalysis": "analysis of education section with specific suggestions",
+  "skillsAnalysis": "analysis — are skills categorized properly, any duplicates, missing important ones",
+
+  "improvements": [
+    { "section": "exact section name", "priority": "high", "issue": "exact problem found", "tip": "exact actionable fix with example" },
+    { "section": "exact section name", "priority": "high", "issue": "exact problem", "tip": "exact fix" },
+    { "section": "exact section name", "priority": "medium", "issue": "exact problem", "tip": "exact fix" },
+    { "section": "exact section name", "priority": "medium", "issue": "exact problem", "tip": "exact fix" },
+    { "section": "exact section name", "priority": "low", "issue": "exact problem", "tip": "exact fix" }
+  ],
+
+  "missingSection": ["sections completely absent from resume"],
 
   "overallTips": [
-    "high-impact tip 1 that will most improve this resume",
-    "high-impact tip 2",
-    "high-impact tip 3"
+    "single most impactful change that will increase score the most",
+    "second most impactful change",
+    "third most impactful change"
   ]
 }
 
-Rules:
-- Be brutally honest. Do NOT give inflated scores.
-- Every point must be SPECIFIC to this resume, not generic advice.
-- If bullet points lack numbers/metrics, say so with examples of how to rewrite them.
-- If the resume is 1 page for 5+ years experience, flag it.
-- Check for spelling/grammar issues and mention them.
-- Score 90+ only if the resume is truly exceptional.`;
+Critical rules:
+- Be brutally honest. A student resume with no experience should score 40-55 max.
+- Every piece of feedback must reference ACTUAL content from the resume, not generic advice.
+- If projects lack bullet points, say which project and show how to rewrite it.
+- If summary is too generic or keyword-stuffed, say so and rewrite it.
+- Certifications section: if empty, suggest 3 specific certs relevant to their actual skills.
+- Never give 10/10 for experience if there is no real work experience.
+- Score 80+ only if resume is genuinely strong with experience + metrics + proper formatting.`;
 
     const text = await askAI(prompt);
     const jsonMatch = text.match(/\{[\s\S]*\}/);
