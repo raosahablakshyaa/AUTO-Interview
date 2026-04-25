@@ -47,9 +47,7 @@ function InterviewRoom() {
   const [warningAlert, setWarningAlert] = useState(null);
   const [aiText, setAiText] = useState("");
   const [nextTimeLimit, setNextTimeLimit] = useState(timePerQ);
-  const [doubtTranscript, setDoubtTranscript] = useState("");
-  const [isListeningDoubt, setIsListeningDoubt] = useState(false);
-  const doubtRecognitionRef = useRef(null);
+
 
   // Keep answersRef in sync
   useEffect(() => { answersRef.current = answers; }, [answers]);
@@ -232,17 +230,17 @@ function InterviewRoom() {
     introSpoken.current = true;
 
     const greet = language === "hindi"
-      ? (candidateName ? `नमस्ते ${candidateName} जी! मैं आज आपका इंटरव्यू लूंगा। मैंने आपका रेज़्यूमे ध्यान से पढ़ा है और मुझे कहना होगा, आपका प्रोफाइल काफी अच्छा है। आज हम एक professional interview session करेंगे। बस relax रहिए और naturally जवाब दीजिए। क्या आपका कोई सवाल है interview शुरू होने से पहले?`
-        : `नमस्ते! मैं आज आपका इंटरव्यू लूंगा। मैंने आपका रेज़्यूमे देखा है। क्या आपका कोई सवाल है शुरू होने से पहले?`)
+      ? (candidateName ? `नमस्ते ${candidateName} जी! मैं आज आपका इंटरव्यू लूंगा। मैंने आपका रेज़्यूमे ध्यान से पढ़ा है और मुझे कहना होगा, आपका प्रोफाइल काफी अच्छा है। बस relax रहिए और naturally जवाब दीजिए। चलिए शुरू करते हैं।`
+        : `नमस्ते! मैं आज आपका इंटरव्यू लूंगा। मैंने आपका रेज़्यूमे देखा है। चलिए शुरू करते हैं।`)
       : language === "hinglish"
-      ? (candidateName ? `Hello ${candidateName} ji! Main aaj aapka interviewer hoon. Maine aapka resume carefully padha hai aur mujhe kehna hoga, aapka profile kaafi accha hai. Aaj hum ek professional interview session karenge. Bas relax rahiye aur naturally jawab dijiye. Kya aapka koi sawaal hai interview shuru hone se pehle?`
-        : `Hello! Main aaj aapka interviewer hoon. Maine aapka resume dekha hai. Kya aapka koi sawaal hai shuru hone se pehle?`)
-      : (candidateName ? `Hello ${candidateName}! I'll be conducting your interview today. I've carefully gone through your resume and I must say, your profile looks quite impressive. We'll have a professional interview session today — just be yourself and answer naturally. Before we begin, do you have any questions for me?`
-        : `Hello! I'll be conducting your interview today. I've gone through your resume. Before we begin, do you have any questions for me?`);
+      ? (candidateName ? `Hello ${candidateName} ji! Main aaj aapka interviewer hoon. Maine aapka resume carefully padha hai, aapka profile kaafi accha hai. Bas relax rahiye aur naturally jawab dijiye. Chaliye shuru karte hain.`
+        : `Hello! Main aaj aapka interviewer hoon. Maine aapka resume dekha hai. Chaliye shuru karte hain.`)
+      : (candidateName ? `Hello ${candidateName}! I'll be conducting your interview today. I've carefully gone through your resume and your profile looks quite impressive. Just be yourself and answer naturally. Let's get started!`
+        : `Hello! I'll be conducting your interview today. I've gone through your resume. Let's get started!`);
 
     setTimeout(() => {
       setPhase("greeting");
-      speakAI(greet, () => setPhase("doubts"));
+      speakAI(greet, () => { setPhase("question"); askQuestion(0); });
     }, 1000);
   }, []);
 
@@ -348,58 +346,6 @@ function InterviewRoom() {
     }, 200);
   };
 
-  const handleNoDoubts = () => {
-    doubtRecognitionRef.current?.stop();
-    setIsListeningDoubt(false);
-    const msg = language === "hindi"
-      ? "बिल्कुल ठीक है! तो चलिए शुरू करते हैं। ध्यान से सुनिए और सोच समझकर जवाब दीजिए।"
-      : language === "hinglish"
-      ? "Perfect! Toh chaliye shuru karte hain. Dhyaan se suniye aur naturally answer kijiye."
-      : "Perfect! No worries at all. Alright then, let's get started. Listen carefully and take your time with each answer.";
-    speakAI(msg, () => { setPhase("question"); askQuestion(0); });
-  };
-
-  const handleSubmitDoubt = async () => {
-    const doubt = doubtTranscript.trim();
-    doubtRecognitionRef.current?.stop();
-    setIsListeningDoubt(false);
-    if (!doubt) { handleNoDoubts(); return; }
-
-    setDoubtTranscript("");
-    const thinking = language === "hindi" ? "एक पल..." : language === "hinglish" ? "Ek second..." : "One moment...";
-    speakAI(thinking);
-
-    try {
-      const res = await fetch(`${ServerURL}/api/interview/reply-doubt`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ doubt, language, candidateName }),
-      });
-      const data = await res.json();
-      speakAI(data.reply, () => setPhase("doubts"));
-    } catch {
-      const fallback = language === "hindi" ? "अच्छा सवाल है! चलिए शुरू करते हैं।" : language === "hinglish" ? "Achha sawaal! Chaliye shuru karte hain." : "Great question! Let's get started.";
-      speakAI(fallback, () => setPhase("doubts"));
-    }
-  };
-
-  const startListeningDoubt = () => {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) return;
-    const r = new SR();
-    r.continuous = false;
-    r.interimResults = true;
-    r.lang = language === "hindi" ? "hi-IN" : "en-US";
-    r.onresult = (e) => {
-      const t = Array.from(e.results).map(x => x[0].transcript).join("");
-      setDoubtTranscript(t);
-    };
-    r.onend = () => setIsListeningDoubt(false);
-    r.start();
-    doubtRecognitionRef.current = r;
-    setIsListeningDoubt(true);
-  };
 
   const questionPrefixes = {
     hindi: [
@@ -723,31 +669,6 @@ function InterviewRoom() {
             </div>
           )}
 
-          {/* Doubts phase */}
-          {phase === "doubts" && (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-gray-800 rounded-2xl p-4 flex flex-col gap-3">
-              <p className="text-xs text-gray-400">
-                {language === "hindi" ? "कोई सवाल है? बोलिए या सीधे शुरू करें" : language === "hinglish" ? "Koi sawaal? Boliye ya seedha shuru karein" : "Any doubts? Speak or skip"}
-              </p>
-              {doubtTranscript && <p className="text-sm text-gray-300 bg-gray-700 rounded-xl px-3 py-2">{doubtTranscript}</p>}
-              <div className="flex gap-2">
-                <button
-                  onClick={isListeningDoubt ? () => { doubtRecognitionRef.current?.stop(); setIsListeningDoubt(false); } : startListeningDoubt}
-                  className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-xl text-sm cursor-pointer ${isListeningDoubt ? "bg-red-500" : "bg-gray-700 hover:bg-gray-600"}`}
-                >
-                  {isListeningDoubt ? <><MdMicOff size={14} /> {language === "hindi" ? "रोकें" : "Stop"}</> : <><MdMic size={14} /> {language === "hindi" ? "बोलें" : language === "hinglish" ? "Boliye" : "Ask"}</>}
-                </button>
-                {doubtTranscript && (
-                  <button onClick={handleSubmitDoubt} className="flex-1 bg-blue-600 hover:bg-blue-700 py-2 rounded-xl text-sm cursor-pointer">
-                    {language === "hindi" ? "भेजें" : language === "hinglish" ? "Submit" : "Submit"}
-                  </button>
-                )}
-                <button onClick={handleNoDoubts} className="flex-1 bg-white text-black py-2 rounded-xl text-sm font-medium hover:bg-gray-200 cursor-pointer">
-                  {language === "hindi" ? "शुरू करें →" : language === "hinglish" ? "Shuru →" : "Begin →"}
-                </button>
-              </div>
-            </motion.div>
-          )}
 
           {/* Next Button */}
           {phase === "answering" && (
