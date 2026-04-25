@@ -2,14 +2,27 @@ import jwt from "jsonwebtoken";
 
 const isAuth = (req, res, next) => {
     try {
-        const token = req.cookies.token;
-        if (!token) return res.status(401).json({ message: "Unauthorized" });
-        const decoded = jwt.verify(token, process.env.JWTSECRET);
-        req.userID = decoded.userID;
+        let { token } = req.cookies;
+
+        if (!token) {
+            return res.status(401).json({message: "Unauthorized"});
+            }
+        const verified = jwt.verify(token, process.env.JWTSECRET);
+
+        if (!verified) {
+            return res.status(401).json({message: "Unauthorized"});
+        }
+
+        req.userID = verified.userID;
+
         next();
+
     } catch (error) {
-        return res.status(401).json({ message: "Invalid token" });
+        console.log(`AUTH MIDDLEWARE ERROR: ${error}`);
+        return res.status(500).json({
+            message: "Authentication failed"
+        });
     }
 };
 
-export default isAuth;
+export default isAuth;          

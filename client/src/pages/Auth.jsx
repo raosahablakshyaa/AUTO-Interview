@@ -1,194 +1,119 @@
-import React, { useState } from "react";
+import React, { useRef, useState, useCallback } from "react";
 import { TbRobot } from "react-icons/tb";
 import { FcGoogle } from "react-icons/fc";
-import { MdEmail, MdLock, MdPerson, MdVisibility, MdVisibilityOff } from "react-icons/md";
-import { motion, AnimatePresence } from "motion/react";
-import { signInWithPopup } from "firebase/auth";
-import { auth, provider } from "../utils/firebase";
+import { motion } from "motion/react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
-import { useDispatch } from "react-redux";
-import { setUser } from "../redux/userSlice";
-import { ServerURL } from "../App";
 
 function Auth() {
-  const navigate = useNavigate();
-  const dispatch = useDispatch();
-  const [mode, setMode] = useState("login"); // login | signup
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [fillPercent, setFillPercent] = useState(0);
+  const dragging = useRef(false);
+  const sliderRef = useRef(null);
+  const thumbSize = 48;
 
-  const handleChange = (e) => {
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
-    setError("");
-  };
+  const handleGoogleLogin = () => {
+    try{
+        const response = await signInWithPopup(auth, provider);
+        let User = response.user;
+        let name = User.displayName;    
+        let email = User.email;
+        const result = await axios.post(`${ServerURL}api/auth/google`, {
+            name,
+            email
+        });
+        console.log(result.data)
+    }catch(error){
+        console.log(`GOOGLE LOGIN ERROR ${error}`)
+    }};
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-    if (mode === "signup" && !form.name.trim()) return setError("Name is required");
-    if (!form.email.trim()) return setError("Email is required");
-    if (!form.password) return setError("Password is required");
-    if (mode === "signup" && form.password.length < 6) return setError("Password must be at least 6 characters");
+  const getPercent = useCallback((clientX) => {
+    const rect = sliderRef.current.getBoundingClientRect();
+    const maxX = rect.width - thumbSize;
+    const x = Math.min(Math.max(clientX - rect.left - thumbSize / 2, 0), maxX);
+    return (x / maxX) * 100;
+  }, []);
 
-    setLoading(true);
-    try {
-      const endpoint = mode === "login" ? "/api/auth/login" : "/api/auth/register";
-      const payload = mode === "login"
-        ? { email: form.email, password: form.password }
-        : { name: form.name, email: form.email, password: form.password };
+  const onMouseDown = () => { dragging.current = true; };
 
-      const res = await axios.post(`${ServerURL}${endpoint}`, payload, { withCredentials: true });
-      dispatch(setUser(res.data.user));
-      navigate("/");
-    } catch (err) {
-      setError(err.response?.data?.message || "Something went wrong");
-    } finally {
-      setLoading(false);
+  const onMouseMove = useCallback((e) => {
+    if (!dragging.current) return;
+    requestAnimationFrame(() => setFillPercent(getPercent(e.clientX)));
+  }, [getPercent]);
+
+  const onRelease = useCallback((clientX) => {
+    if (!dragging.current) return;
+    dragging.current = false;
+    const percent = getPercent(clientX);
+    if (percent >= 90) {
+      setFillPercent(100);
+      setTimeout(handleGoogleLogin, 300);
+    } else {
+      setFillPercent(0);
     }
-  };
+  }, [getPercent]);
 
-  const handleGoogle = async () => {
-    setError("");
-    setLoading(true);
-    try {
-      const response = await signInWithPopup(auth, provider);
-      const { displayName, email, photoURL } = response.user;
-      const res = await axios.post(`${ServerURL}/api/auth/google`, {
-        name: displayName, email, picture: photoURL
-      }, { withCredentials: true });
-      dispatch(setUser(res.data.user));
-      navigate("/");
-    } catch (err) {
-      setError("Google sign-in failed. Try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const onMouseUp = useCallback((e) => onRelease(e.clientX), [onRelease]);
+  const onTouchMove = useCallback((e) => {
+    requestAnimationFrame(() => setFillPercent(getPercent(e.touches[0].clientX)));
+  }, [getPercent]);
+  const onTouchEnd = useCallback((e) => onRelease(e.changedTouches[0].clientX), [onRelease]);
+
+  const thumbLeft = `calc(${fillPercent} * (100% - ${thumbSize}px) / 100)`;
 
   return (
-    <div className="w-full min-h-screen bg-gray-50 flex items-center justify-center px-4">
-      <motion.div
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-gray-200 p-8"
-      >
-        {/* Logo */}
-        <div className="flex items-center justify-center gap-2 mb-8">
+    <motion.div
+      initial={{ opacity: 0, y: -40 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 1.5 }}
+      className="w-full min-h-screen bg-gray-50 flex items-center justify-center px-6"
+    >
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-gray-200 p-10">
+
+        <div className="flex items-center justify-center gap-3 mb-8">
           <div className="bg-black text-white p-2 rounded-lg">
             <TbRobot size={22} />
           </div>
           <h1 className="text-xl font-bold text-gray-800">Auto_Interview</h1>
         </div>
 
-        {/* Tab Toggle */}
-        <div className="flex bg-gray-100 rounded-xl p-1 mb-6">
-          {["login", "signup"].map((m) => (
-            <button
-              key={m}
-              onClick={() => { setMode(m); setError(""); setForm({ name: "", email: "", password: "" }); }}
-              className={`flex-1 py-2 rounded-lg text-sm font-medium transition cursor-pointer ${mode === m ? "bg-white text-black shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
-            >
-              {m === "login" ? "Sign In" : "Sign Up"}
-            </button>
-          ))}
+        <div className="text-center mb-8">
+          <h2 className="text-2xl font-semibold text-gray-800">Welcome Back</h2>
+          <p className="text-gray-500 text-sm mt-1">Sign in to continue to Auto_Interview</p>
         </div>
 
-        <AnimatePresence mode="wait">
-          <motion.form
-            key={mode}
-            initial={{ opacity: 0, x: mode === "login" ? -20 : 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            onSubmit={handleSubmit}
-            className="space-y-4"
-          >
-            {/* Name — signup only */}
-            {mode === "signup" && (
-              <div className="relative">
-                <MdPerson size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  name="name"
-                  type="text"
-                  placeholder="Full Name"
-                  value={form.name}
-                  onChange={handleChange}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-black transition"
-                />
-              </div>
-            )}
-
-            {/* Email */}
-            <div className="relative">
-              <MdEmail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                name="email"
-                type="email"
-                placeholder="Email Address"
-                value={form.email}
-                onChange={handleChange}
-                className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-black transition"
-              />
-            </div>
-
-            {/* Password */}
-            <div className="relative">
-              <MdLock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                name="password"
-                type={showPassword ? "text" : "password"}
-                placeholder={mode === "signup" ? "Password (min 6 chars)" : "Password"}
-                value={form.password}
-                onChange={handleChange}
-                className="w-full pl-10 pr-10 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-black transition"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(p => !p)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 cursor-pointer"
-              >
-                {showPassword ? <MdVisibilityOff size={18} /> : <MdVisibility size={18} />}
-              </button>
-            </div>
-
-            {/* Error */}
-            {error && (
-              <p className="text-red-500 text-sm text-center">{error}</p>
-            )}
-
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-black text-white py-3 rounded-xl font-medium hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-            >
-              {loading ? "Please wait..." : mode === "login" ? "Sign In" : "Create Account"}
-            </button>
-          </motion.form>
-        </AnimatePresence>
-
-        {/* Divider */}
-        <div className="flex items-center gap-3 my-5">
-          <div className="flex-1 h-px bg-gray-200" />
-          <span className="text-xs text-gray-400">or continue with</span>
-          <div className="flex-1 h-px bg-gray-200" />
-        </div>
-
-        {/* Google */}
-        <button
-          onClick={handleGoogle}
-          disabled={loading}
-          className="w-full flex items-center justify-center gap-3 border border-gray-200 py-3 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+        <div
+          ref={sliderRef}
+          onMouseMove={onMouseMove}
+          onMouseUp={onMouseUp}
+          onMouseLeave={onMouseUp}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+          className="relative w-full h-14 rounded-full border border-gray-300 bg-gray-100 overflow-hidden select-none max-w-xs mx-auto"
         >
-          <FcGoogle size={20} />
-          Continue with Google
-        </button>
-      </motion.div>
-    </div>
+          <div
+            className="absolute top-0 left-0 h-full bg-blue-500 rounded-full"
+            style={{
+              width: `calc(${fillPercent} * (100% - ${thumbSize}px) / 100 + ${thumbSize}px)`,
+              transition: dragging.current ? 'none' : 'width 0.3s ease'
+            }}
+          />
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <span className="text-sm font-medium text-gray-600">Slide to sign in</span>
+          </div>
+          <div
+            onMouseDown={onMouseDown}
+            onTouchStart={onMouseDown}
+            className="absolute top-1 h-12 w-12 bg-white rounded-full shadow-md flex items-center justify-center cursor-grab active:cursor-grabbing z-10 border border-gray-200"
+            style={{
+              left: thumbLeft,
+              transition: dragging.current ? 'none' : 'left 0.3s ease'
+            }}
+          >
+            <FcGoogle size={22} />
+          </div>
+        </div>
+
+      </div>
+    </motion.div>
   );
 }
 
