@@ -9,7 +9,7 @@ const getGroq = () => new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 const askAI = async (prompt, maxTokens = 1000) => {
   const res = await getGroq().chat.completions.create({
-    model: "qwen/qwen3.8-27b",
+    model: "openai/gpt-oss-20b",
     messages: [{ role: "user", content: prompt }],
     temperature: 0.7,
     max_tokens: maxTokens,
