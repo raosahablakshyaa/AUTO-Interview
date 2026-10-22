@@ -13,9 +13,14 @@ const askAI = async (prompt, maxTokens = 950, jsonMode = false) => {
     messages: [{ role: "user", content: prompt }],
     temperature: 0.7,
     max_tokens: maxTokens,
+    ...(jsonMode ? { reasoning_effort: "low" } : {}),
     ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
   });
-  const content = res.choices[0]?.message?.content;
+  const choice = res.choices[0];
+  if (choice?.finish_reason === "length") {
+    throw new Error("AI response exceeded the completion token limit");
+  }
+  const content = choice?.message?.content;
   if (typeof content !== "string" || !content.trim()) {
     throw new Error("AI returned an empty response");
   }
@@ -68,8 +73,8 @@ Resume: ${resumeText}
 JSON: {"experienceAnalysis":"s","educationAnalysis":"s","skillsAnalysis":"s","bulletPointAnalysis":{"hasMetrics":true,"usesActionVerbs":true,"feedback":"s"},"improvements":[{"section":"s","priority":"high","issue":"s","tip":"s"}],"sectionScores":{"basicDetails":{"score":0,"max":10,"feedback":"s","missing":[]},"professionalSummary":{"score":0,"max":10,"feedback":"s","rewrite":"s"},"education":{"score":0,"max":10,"feedback":"s","missing":[]},"experience":{"score":0,"max":25,"feedback":"s","issues":[]},"projects":{"score":0,"max":20,"feedback":"s","issues":[]},"certifications":{"score":0,"max":7,"feedback":"s","suggestions":[]},"skills":{"score":0,"max":10,"feedback":"s","missing":[]},"formatting":{"score":0,"max":8,"feedback":"s","issues":[]}}}`;
 
     const [text1, text2] = await Promise.all([
-      askAI(prompt1, 1600, true),
-      askAI(prompt2, 1600, true),
+      askAI(prompt1, 4096, true),
+      askAI(prompt2, 4096, true),
     ]);
     const analysis = { ...parseJsonObject(text1), ...parseJsonObject(text2) };
 
@@ -125,7 +130,7 @@ Rules:
 
 Return ONLY a JSON object with a "questions" array containing ${questionCount} question strings. Example: {"questions":["Question 1?", "[CODE] Write a function to..."]}`;
 
-    const text = await askAI(prompt, 1200, true);
+    const text = await askAI(prompt, 4096, true);
     const response = parseJsonObject(text);
     const questions = response.questions;
     if (!Array.isArray(questions) || questions.some((question) => typeof question !== "string")) {
@@ -191,7 +196,7 @@ Provide a JSON response with this exact structure:
 
 Be honest and constructive. Always highlight genuine positives. Deduct points for warnings (${warningCount} warnings detected).`;
 
-    const text = await askAI(prompt, 1800, true);
+    const text = await askAI(prompt, 4096, true);
     const analysis = parseJsonObject(text);
 
     await Interview.findByIdAndUpdate(interviewId, {
