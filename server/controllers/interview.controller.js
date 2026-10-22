@@ -69,49 +69,19 @@ export const analyzeResume = async (req, res) => {
     const pdfData = await pdfParse(pdfBuffer);
     const resumeText = pdfData.text.slice(0, 2000);
 
-    const prompt = `Analyze this resume. Return ONLY valid JSON, no markdown.
+    const prompt1 = `Analyze this resume. Return ONLY valid JSON, no markdown.
+Resume: ${resumeText}
+JSON: {"score":0,"verdict":"good","summary":"s","atsScore":0,"atsTips":["t"],"strongPoints":["s"],"weakPoints":["w"],"keywordsFound":["k"],"keywordsMissing":["k"],"overallTips":["t"],"missingSection":[]}`;
 
-Resume:
-${resumeText}
+    const prompt2 = `Analyze this resume. Return ONLY valid JSON, no markdown.
+Resume: ${resumeText}
+JSON: {"experienceAnalysis":"s","educationAnalysis":"s","skillsAnalysis":"s","bulletPointAnalysis":{"hasMetrics":true,"usesActionVerbs":true,"feedback":"s"},"improvements":[{"section":"s","priority":"high","issue":"s","tip":"s"}],"sectionScores":{"basicDetails":{"score":0,"max":10,"feedback":"s","missing":[]},"professionalSummary":{"score":0,"max":10,"feedback":"s","rewrite":"s"},"education":{"score":0,"max":10,"feedback":"s","missing":[]},"experience":{"score":0,"max":25,"feedback":"s","issues":[]},"projects":{"score":0,"max":20,"feedback":"s","issues":[]},"certifications":{"score":0,"max":7,"feedback":"s","suggestions":[]},"skills":{"score":0,"max":10,"feedback":"s","missing":[]},"formatting":{"score":0,"max":8,"feedback":"s","issues":[]}}}`;
 
-JSON:
-{
-  "score": <0-100>,
-  "verdict": "good"|"average"|"poor",
-  "summary": "2 sentence assessment",
-  "atsScore": <0-100>,
-  "strongPoints": ["s1","s2","s3"],
-  "weakPoints": ["w1","w2","w3"],
-  "keywordsFound": ["k1","k2","k3"],
-  "keywordsMissing": ["k1","k2","k3","k4","k5"],
-  "atsTips": ["t1","t2","t3"],
-  "bulletPointAnalysis": {"hasMetrics": true, "usesActionVerbs": true, "feedback": "brief"},
-  "missingSection": [],
-  "overallTips": ["tip1","tip2","tip3"],
-  "experienceAnalysis": "brief",
-  "educationAnalysis": "brief",
-  "skillsAnalysis": "brief",
-  "improvements": [
-    {"section": "s", "priority": "high", "issue": "i", "tip": "t"},
-    {"section": "s", "priority": "medium", "issue": "i", "tip": "t"},
-    {"section": "s", "priority": "low", "issue": "i", "tip": "t"}
-  ],
-  "sectionScores": {
-    "basicDetails": {"score": 0, "max": 10, "feedback": "brief", "missing": []},
-    "professionalSummary": {"score": 0, "max": 10, "feedback": "brief", "rewrite": ""},
-    "education": {"score": 0, "max": 10, "feedback": "brief", "missing": []},
-    "experience": {"score": 0, "max": 25, "feedback": "brief", "issues": []},
-    "projects": {"score": 0, "max": 20, "feedback": "brief", "issues": []},
-    "certifications": {"score": 0, "max": 7, "feedback": "brief", "suggestions": []},
-    "skills": {"score": 0, "max": 10, "feedback": "brief", "missing": []},
-    "formatting": {"score": 0, "max": 8, "feedback": "brief", "issues": []}
-  }
-}`;
-
-    const text = await askAI(prompt, 950);
-    const jsonMatch = text.match(/\{[\s\S]*/);
-    if (!jsonMatch) throw new Error("No JSON in response");
-    const analysis = JSON.parse(fixTruncatedJson(jsonMatch[0]));
+    const [text1, text2] = await Promise.all([askAI(prompt1, 950), askAI(prompt2, 950)]);
+    const m1 = text1.match(/\{[\s\S]*/);
+    const m2 = text2.match(/\{[\s\S]*/);
+    if (!m1 || !m2) throw new Error("No JSON in response");
+    const analysis = { ...JSON.parse(fixTruncatedJson(m1[0])), ...JSON.parse(fixTruncatedJson(m2[0])) };
 
     return res.status(200).json(analysis);
   } catch (error) {
