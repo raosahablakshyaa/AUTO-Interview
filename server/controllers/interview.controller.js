@@ -5,7 +5,22 @@ const pdfParse = require("pdf-parse");
 import Interview from "../models/interview.model.js";
 import User from "../models/user.model.js";
 
-const getGroq = () => new Groq({ apiKey: process.env.GROQ_API_KEY });
+const fixTruncatedJson = (str) => {
+  // Find the last complete key-value by trimming to last valid } or ]
+  let s = str.trim();
+  // Remove trailing incomplete key-value pairs
+  s = s.replace(/,\s*"[^"]*"\s*:\s*[^,}\]]*$/, "");
+  s = s.replace(/,\s*"[^"]*"\s*:?\s*$/, "");
+  // Close all open arrays and objects
+  const opens = [];
+  for (const ch of s) {
+    if (ch === '{') opens.push('}');
+    else if (ch === '[') opens.push(']');
+    else if (ch === '}' || ch === ']') opens.pop();
+  }
+  return s + opens.reverse().join('');
+};
+
 
 const askAI = async (prompt, maxTokens = 950) => {
   const res = await getGroq().chat.completions.create({
@@ -92,8 +107,9 @@ JSON:
 }`;
 
     const text = await askAI(prompt, 950);
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    const analysis = JSON.parse(jsonMatch[0]);
+    const jsonMatch = text.match(/\{[\s\S]*/);
+    if (!jsonMatch) throw new Error("No JSON in response");
+    const analysis = JSON.parse(fixTruncatedJson(jsonMatch[0]));
 
     return res.status(200).json(analysis);
   } catch (error) {
@@ -148,8 +164,9 @@ Rules:
 Return ONLY a JSON array of ${questionCount} question strings. Example: ["Question 1?", "[CODE] Write a function to..."]`;
 
     const text = await askAI(prompt, 800);
-    const jsonMatch = text.match(/\[[\s\S]*\]/);
-    const questions = JSON.parse(jsonMatch[0]);
+    const jsonMatch = text.match(/\[[\s\S]*/);
+    if (!jsonMatch) throw new Error("No JSON array in response");
+    const questions = JSON.parse(fixTruncatedJson(jsonMatch[0]));
 
     const interview = await Interview.create({
       userId: req.userID,
@@ -211,8 +228,9 @@ Provide a JSON response with this exact structure:
 Be honest and constructive. Always highlight genuine positives. Deduct points for warnings (${warningCount} warnings detected).`;
 
     const text = await askAI(prompt, 900);
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    const analysis = JSON.parse(jsonMatch[0]);
+    const jsonMatch = text.match(/\{[\s\S]*/);
+    if (!jsonMatch) throw new Error("No JSON in response");
+    const analysis = JSON.parse(fixTruncatedJson(jsonMatch[0]));
 
     await Interview.findByIdAndUpdate(interviewId, {
       answers,
