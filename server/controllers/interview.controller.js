@@ -5,11 +5,7 @@ const pdfParse = require("pdf-parse");
 import Interview from "../models/interview.model.js";
 import User from "../models/user.model.js";
 
-let groq;
-const getGroq = () => {
-  if (!groq) groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-  return groq;
-};
+const getGroq = () => new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 const askAI = async (prompt) => {
   const res = await getGroq().chat.completions.create({
