@@ -7,13 +7,13 @@ import User from "../models/user.model.js";
 
 const getGroq = () => new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-const askAI = async (prompt) => {
+const askAI = async (prompt, maxTokens = 1000) => {
   const res = await getGroq().chat.completions.create({
     model: "qwen/qwen3.8-27b",
     messages: [{ role: "user", content: prompt }],
     temperature: 0.7,
+    max_tokens: maxTokens,
   });
-  // Strip <think>...</think> tags that qwen model adds
   return res.choices[0].message.content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
 };
 
@@ -44,88 +44,48 @@ export const analyzeResume = async (req, res) => {
   try {
     const pdfBuffer = req.file.buffer;
     const pdfData = await pdfParse(pdfBuffer);
-    const resumeText = pdfData.text.slice(0, 6000);
+    const resumeText = pdfData.text.slice(0, 3000);
 
-    const prompt = `You are the world's most advanced resume scoring AI, trained on 10 million resumes and hiring data from Google, Amazon, Microsoft, McKinsey, and top startups. You score resumes like a strict ATS + senior recruiter combined.
+    const prompt = `You are a resume scoring AI. Analyze this resume and return ONLY valid JSON, no markdown, no extra text.
 
-Resume Text:
+Resume:
 ${resumeText}
 
-Perform a DEEP, SPECIFIC, SECTION-BY-SECTION analysis. Return ONLY valid JSON, no markdown, no extra text.
-
-Scoring Breakdown (total 100 points):
-- Basic Details: 10 pts (name, email, phone, LinkedIn, GitHub)
-- Professional Summary: 10 pts (clarity, relevance, keywords, length)
-- Education: 10 pts (degree, institution, year, GPA if applicable)
-- Experience: 25 pts (roles, impact metrics, action verbs, relevance)
-- Projects: 20 pts (tech stack mentioned, outcomes, bullet points, links)
-- Certifications: 7.5 pts
-- Skills: 10 pts (categorized, relevant, not bloated)
-- Formatting & ATS: 7.5 pts (single column, standard fonts, no tables/images, proper headings)
-
-JSON structure to return:
+Return this exact JSON:
 {
-  "score": <0-100, calculated from section scores>,
+  "score": <0-100>,
   "verdict": "good" | "average" | "poor",
-  "summary": "3-4 sentence honest assessment mentioning candidate name, field, experience level, biggest strength and biggest gap",
-
+  "summary": "2-3 sentence assessment",
   "sectionScores": {
-    "basicDetails": { "score": <0-10>, "max": 10, "feedback": "specific feedback", "missing": ["list of missing items like LinkedIn, GitHub etc"] },
-    "professionalSummary": { "score": <0-10>, "max": 10, "feedback": "specific feedback on their actual summary", "rewrite": "rewrite their summary better using their own info from resume" },
-    "education": { "score": <0-10>, "max": 10, "feedback": "specific feedback", "missing": ["GPA if not mentioned", "relevant coursework"] },
-    "experience": { "score": <0-25>, "max": 25, "feedback": "specific feedback — if no experience say so clearly and give exact tips", "issues": ["list of specific issues found"] },
-    "projects": { "score": <0-20>, "max": 20, "feedback": "specific feedback on each project found", "issues": ["list of specific issues"] },
-    "certifications": { "score": <0-7.5>, "max": 7.5, "feedback": "specific feedback", "suggestions": ["suggest 3 specific certifications relevant to their skills"] },
-    "skills": { "score": <0-10>, "max": 10, "feedback": "specific feedback on their skills section", "bloated": ["skills that seem irrelevant or too generic"], "missing": ["important skills missing based on their profile"] },
-    "formatting": { "score": <0-7.5>, "max": 7.5, "feedback": "specific formatting feedback", "issues": ["list of formatting issues"] }
+    "basicDetails": { "score": <0-10>, "max": 10, "feedback": "brief feedback", "missing": [] },
+    "professionalSummary": { "score": <0-10>, "max": 10, "feedback": "brief feedback", "rewrite": "" },
+    "education": { "score": <0-10>, "max": 10, "feedback": "brief feedback", "missing": [] },
+    "experience": { "score": <0-25>, "max": 25, "feedback": "brief feedback", "issues": [] },
+    "projects": { "score": <0-20>, "max": 20, "feedback": "brief feedback", "issues": [] },
+    "certifications": { "score": <0-7>, "max": 7, "feedback": "brief feedback", "suggestions": [] },
+    "skills": { "score": <0-10>, "max": 10, "feedback": "brief feedback", "missing": [] },
+    "formatting": { "score": <0-8>, "max": 8, "feedback": "brief feedback", "issues": [] }
   },
-
   "atsScore": <0-100>,
-  "atsTips": ["5 specific ATS tips based on this resume"],
-
-  "bulletPointAnalysis": {
-    "hasMetrics": <true|false>,
-    "usesActionVerbs": <true|false>,
-    "feedback": "specific feedback with example of how to rewrite one of their actual bullet points with metrics"
-  },
-
-  "strongPoints": ["5 specific strengths with reference to actual content in resume"],
-  "weakPoints": ["5 specific weaknesses with exact location — e.g. 'Project AutoMind AI has no tech stack mentioned'"],
-
-  "keywordsFound": ["strong keywords found in resume relevant to their field"],
-  "keywordsMissing": ["10 important keywords missing that recruiters search for in their domain"],
-
-  "experienceAnalysis": "detailed analysis — if no experience, give specific advice on what internships/freelance/open source to add and how to frame them",
-  "educationAnalysis": "analysis of education section with specific suggestions",
-  "skillsAnalysis": "analysis — are skills categorized properly, any duplicates, missing important ones",
-
+  "atsTips": ["tip1", "tip2", "tip3"],
+  "bulletPointAnalysis": { "hasMetrics": true, "usesActionVerbs": true, "feedback": "brief" },
+  "strongPoints": ["point1", "point2", "point3"],
+  "weakPoints": ["point1", "point2", "point3"],
+  "keywordsFound": ["kw1", "kw2", "kw3"],
+  "keywordsMissing": ["kw1", "kw2", "kw3", "kw4", "kw5"],
+  "experienceAnalysis": "brief analysis",
+  "educationAnalysis": "brief analysis",
+  "skillsAnalysis": "brief analysis",
   "improvements": [
-    { "section": "exact section name", "priority": "high", "issue": "exact problem found", "tip": "exact actionable fix with example" },
-    { "section": "exact section name", "priority": "high", "issue": "exact problem", "tip": "exact fix" },
-    { "section": "exact section name", "priority": "medium", "issue": "exact problem", "tip": "exact fix" },
-    { "section": "exact section name", "priority": "medium", "issue": "exact problem", "tip": "exact fix" },
-    { "section": "exact section name", "priority": "low", "issue": "exact problem", "tip": "exact fix" }
+    { "section": "name", "priority": "high", "issue": "problem", "tip": "fix" },
+    { "section": "name", "priority": "medium", "issue": "problem", "tip": "fix" },
+    { "section": "name", "priority": "low", "issue": "problem", "tip": "fix" }
   ],
+  "missingSection": [],
+  "overallTips": ["tip1", "tip2", "tip3"]
+}`;
 
-  "missingSection": ["sections completely absent from resume"],
-
-  "overallTips": [
-    "single most impactful change that will increase score the most",
-    "second most impactful change",
-    "third most impactful change"
-  ]
-}
-
-Critical rules:
-- Be brutally honest. A student resume with no experience should score 40-55 max.
-- Every piece of feedback must reference ACTUAL content from the resume, not generic advice.
-- If projects lack bullet points, say which project and show how to rewrite it.
-- If summary is too generic or keyword-stuffed, say so and rewrite it.
-- Certifications section: if empty, suggest 3 specific certs relevant to their actual skills.
-- Never give 10/10 for experience if there is no real work experience.
-- Score 80+ only if resume is genuinely strong with experience + metrics + proper formatting.`;
-
-    const text = await askAI(prompt);
+    const text = await askAI(prompt, 900);
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     const analysis = JSON.parse(jsonMatch[0]);
 
@@ -181,7 +141,7 @@ Rules:
 
 Return ONLY a JSON array of ${questionCount} question strings. Example: ["Question 1?", "[CODE] Write a function to..."]`;
 
-    const text = await askAI(prompt);
+    const text = await askAI(prompt, 800);
     const jsonMatch = text.match(/\[[\s\S]*\]/);
     const questions = JSON.parse(jsonMatch[0]);
 
@@ -244,7 +204,7 @@ Provide a JSON response with this exact structure:
 
 Be honest and constructive. Always highlight genuine positives. Deduct points for warnings (${warningCount} warnings detected).`;
 
-    const text = await askAI(prompt);
+    const text = await askAI(prompt, 900);
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     const analysis = JSON.parse(jsonMatch[0]);
 
