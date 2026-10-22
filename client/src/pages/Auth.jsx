@@ -1,87 +1,42 @@
-import React, { useRef, useState, useCallback, useEffect } from "react";
+import React, { useState } from "react";
 import { TbRobot } from "react-icons/tb";
-import { FcGoogle } from "react-icons/fc";
 import { motion } from "motion/react";
 import axios from "axios";
 import { useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { setUser } from "../redux/userSlice";
-import { auth, provider } from "../utils/firebase";
-import { signInWithPopup } from "firebase/auth";
 import { ServerURL } from "../App";
-
-const THUMB = 48;
 
 function Auth() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const [fill, setFill] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const sliderRef = useRef(null);
-  const dragging = useRef(false);
+  const [isLogin, setIsLogin] = useState(true);
+  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const getPercent = useCallback((clientX) => {
-    const rect = sliderRef.current.getBoundingClientRect();
-    const max = rect.width - THUMB;
-    const x = Math.min(Math.max(clientX - rect.left - THUMB / 2, 0), max);
-    return (x / max) * 100;
-  }, []);
-
-  const handleGoogleLogin = async () => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
     try {
-      const response = await signInWithPopup(auth, provider);
-      const { displayName: name, email, photoURL: picture } = response.user;
-      const res = await axios.post(`${ServerURL}/api/auth/google`, { name, email, picture }, { withCredentials: true });
+      const endpoint = isLogin ? "/api/auth/login" : "/api/auth/register";
+      const payload = isLogin ? { email: form.email, password: form.password } : form;
+      const res = await axios.post(`${ServerURL}${endpoint}`, payload, { withCredentials: true });
       dispatch(setUser(res.data.user));
       navigate("/");
-    } catch (error) {
-      console.log("GOOGLE LOGIN ERROR", error);
-      setFill(0);
+    } catch (err) {
+      setError(err.response?.data?.message || "Something went wrong");
+    } finally {
+      setLoading(false);
     }
   };
-
-  const onStart = useCallback(() => {
-    dragging.current = true;
-    setIsDragging(true);
-  }, []);
-
-  const onMove = useCallback((clientX) => {
-    if (!dragging.current) return;
-    setFill(getPercent(clientX));
-  }, [getPercent]);
-
-  const onEnd = useCallback((clientX) => {
-    if (!dragging.current) return;
-    dragging.current = false;
-    setIsDragging(false);
-    const percent = getPercent(clientX);
-    if (percent >= 88) {
-      setFill(100);
-      setTimeout(handleGoogleLogin, 200);
-    } else {
-      setFill(0);
-    }
-  }, [getPercent]);
-
-  // Mouse events on window so drag works outside slider
-  useEffect(() => {
-    const move = (e) => onMove(e.clientX);
-    const up = (e) => onEnd(e.clientX);
-    window.addEventListener("mousemove", move);
-    window.addEventListener("mouseup", up);
-    return () => {
-      window.removeEventListener("mousemove", move);
-      window.removeEventListener("mouseup", up);
-    };
-  }, [onMove, onEnd]);
-
-  const thumbLeft = `calc(${fill} * (100% - ${THUMB}px) / 100)`;
 
   return (
     <motion.div
       initial={{ opacity: 0, y: -40 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.8 }}
+      transition={{ duration: 0.6 }}
       className="w-full min-h-screen bg-gray-50 flex items-center justify-center px-6"
     >
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-gray-200 p-10">
@@ -94,47 +49,55 @@ function Auth() {
         </div>
 
         <div className="text-center mb-8">
-          <h2 className="text-2xl font-semibold text-gray-800">Welcome Back</h2>
-          <p className="text-gray-500 text-sm mt-1">Sign in to continue to Auto_Interview</p>
+          <h2 className="text-2xl font-semibold text-gray-800">{isLogin ? "Welcome Back" : "Create Account"}</h2>
+          <p className="text-gray-500 text-sm mt-1">{isLogin ? "Sign in to continue" : "Sign up to get started"}</p>
         </div>
 
-        <div
-          ref={sliderRef}
-          className="relative w-full h-14 rounded-full border border-gray-300 bg-gray-100 overflow-hidden select-none"
-        >
-          {/* Fill bar */}
-          <div
-            className="absolute top-0 left-0 h-full bg-blue-500 rounded-full"
-            style={{
-              width: `calc(${fill} * (100% - ${THUMB}px) / 100 + ${THUMB}px)`,
-              transition: isDragging ? "none" : "width 0.3s ease",
-            }}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {!isLogin && (
+            <input
+              type="text"
+              placeholder="Full Name"
+              value={form.name}
+              onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))}
+              required
+              className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-black transition"
+            />
+          )}
+          <input
+            type="email"
+            placeholder="Email"
+            value={form.email}
+            onChange={(e) => setForm(p => ({ ...p, email: e.target.value }))}
+            required
+            className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-black transition"
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={form.password}
+            onChange={(e) => setForm(p => ({ ...p, password: e.target.value }))}
+            required
+            className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm outline-none focus:border-black transition"
           />
 
-          {/* Label */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <span className={`text-sm font-medium transition-colors ${fill > 40 ? "text-white" : "text-gray-500"}`}>
-              {fill >= 88 ? "Signing in..." : "Slide to sign in →"}
-            </span>
-          </div>
+          {error && <p className="text-red-500 text-sm">{error}</p>}
 
-          {/* Thumb */}
-          <div
-            onMouseDown={onStart}
-            onTouchStart={(e) => { onStart(); onMove(e.touches[0].clientX); }}
-            onTouchMove={(e) => onMove(e.touches[0].clientX)}
-            onTouchEnd={(e) => onEnd(e.changedTouches[0].clientX)}
-            className="absolute top-1 h-12 w-12 bg-white rounded-full shadow-md flex items-center justify-center cursor-grab active:cursor-grabbing z-10 border border-gray-200"
-            style={{
-              left: thumbLeft,
-              transition: isDragging ? "none" : "left 0.3s ease",
-            }}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-black text-white py-3 rounded-xl font-medium hover:bg-gray-800 transition disabled:opacity-50 cursor-pointer"
           >
-            <FcGoogle size={22} />
-          </div>
-        </div>
+            {loading ? "Please wait..." : isLogin ? "Sign In" : "Sign Up"}
+          </button>
+        </form>
 
-        <p className="text-center text-xs text-gray-400 mt-4">Drag the Google icon all the way to sign in</p>
+        <p className="text-center text-sm text-gray-500 mt-6">
+          {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
+          <button onClick={() => { setIsLogin(p => !p); setError(""); }} className="text-black font-semibold cursor-pointer hover:underline">
+            {isLogin ? "Sign Up" : "Sign In"}
+          </button>
+        </p>
       </div>
     </motion.div>
   );
