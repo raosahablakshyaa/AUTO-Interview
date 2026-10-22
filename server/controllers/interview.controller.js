@@ -9,9 +9,11 @@ const getGroq = () => new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 const fixTruncatedJson = (str) => {
   let s = str.trim();
+  // Close unterminated string
+  const quoteCount = (s.match(/(?<!\\)"/g) || []).length;
+  if (quoteCount % 2 !== 0) s += '"';
   // Remove trailing incomplete key-value
-  s = s.replace(/,\s*"[^"]*"\s*:\s*"[^"]*$/, "");
-  s = s.replace(/,\s*"[^"]*"\s*:\s*[^,{}\[\]"]*$/, "");
+  s = s.replace(/,\s*"[^"]*"\s*:\s*"[^"]*"?\s*$/, "");
   s = s.replace(/,\s*"[^"]*"\s*:?\s*$/, "");
   // Close open brackets
   const opens = [];
