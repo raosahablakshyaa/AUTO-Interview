@@ -7,12 +7,13 @@ import User from "../models/user.model.js";
 
 const getGroq = () => new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-const askAI = async (prompt, maxTokens = 1000) => {
+const askAI = async (prompt, maxTokens = 900) => {
   const res = await getGroq().chat.completions.create({
     model: "openai/gpt-oss-20b",
     messages: [{ role: "user", content: prompt }],
     temperature: 0.7,
     max_tokens: maxTokens,
+    max_completion_tokens: maxTokens,
   });
   return res.choices[0].message.content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
 };
