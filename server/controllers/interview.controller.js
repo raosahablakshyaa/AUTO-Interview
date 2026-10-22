@@ -7,33 +7,27 @@ import User from "../models/user.model.js";
 
 const getGroq = () => new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-const fixTruncatedJson = (str) => {
-  let s = str.trim();
-  // Close unterminated string
-  const quoteCount = (s.match(/(?<!\\)"/g) || []).length;
-  if (quoteCount % 2 !== 0) s += '"';
-  // Remove trailing incomplete key-value
-  s = s.replace(/,\s*"[^"]*"\s*:\s*"[^"]*"?\s*$/, "");
-  s = s.replace(/,\s*"[^"]*"\s*:?\s*$/, "");
-  // Close open brackets
-  const opens = [];
-  for (const ch of s) {
-    if (ch === '{') opens.push('}');
-    else if (ch === '[') opens.push(']');
-    else if (ch === '}' || ch === ']') opens.pop();
-  }
-  return s + opens.reverse().join('');
-};
-
-
-const askAI = async (prompt, maxTokens = 950) => {
+const askAI = async (prompt, maxTokens = 950, jsonMode = false) => {
   const res = await getGroq().chat.completions.create({
     model: "openai/gpt-oss-20b",
     messages: [{ role: "user", content: prompt }],
     temperature: 0.7,
     max_tokens: maxTokens,
+    ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
   });
-  return res.choices[0].message.content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+  const content = res.choices[0]?.message?.content;
+  if (typeof content !== "string" || !content.trim()) {
+    throw new Error("AI returned an empty response");
+  }
+  return content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+};
+
+const parseJsonObject = (text) => {
+  const parsed = JSON.parse(text);
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("AI response must be a JSON object");
+  }
+  return parsed;
 };
 
 export const replyToDoubt = async (req, res) => {
@@ -73,11 +67,11 @@ JSON: {"score":0,"verdict":"good","summary":"s","atsScore":0,"atsTips":["t"],"st
 Resume: ${resumeText}
 JSON: {"experienceAnalysis":"s","educationAnalysis":"s","skillsAnalysis":"s","bulletPointAnalysis":{"hasMetrics":true,"usesActionVerbs":true,"feedback":"s"},"improvements":[{"section":"s","priority":"high","issue":"s","tip":"s"}],"sectionScores":{"basicDetails":{"score":0,"max":10,"feedback":"s","missing":[]},"professionalSummary":{"score":0,"max":10,"feedback":"s","rewrite":"s"},"education":{"score":0,"max":10,"feedback":"s","missing":[]},"experience":{"score":0,"max":25,"feedback":"s","issues":[]},"projects":{"score":0,"max":20,"feedback":"s","issues":[]},"certifications":{"score":0,"max":7,"feedback":"s","suggestions":[]},"skills":{"score":0,"max":10,"feedback":"s","missing":[]},"formatting":{"score":0,"max":8,"feedback":"s","issues":[]}}}`;
 
-    const [text1, text2] = await Promise.all([askAI(prompt1, 950), askAI(prompt2, 950)]);
-    const m1 = text1.match(/\{[\s\S]*/);
-    const m2 = text2.match(/\{[\s\S]*/);
-    if (!m1 || !m2) throw new Error("No JSON in response");
-    const analysis = { ...JSON.parse(fixTruncatedJson(m1[0])), ...JSON.parse(fixTruncatedJson(m2[0])) };
+    const [text1, text2] = await Promise.all([
+      askAI(prompt1, 1600, true),
+      askAI(prompt2, 1600, true),
+    ]);
+    const analysis = { ...parseJsonObject(text1), ...parseJsonObject(text2) };
 
     return res.status(200).json(analysis);
   } catch (error) {
@@ -129,12 +123,14 @@ Rules:
 - For mixed: combine both technical and HR
 - Include coding questions prefixed with [CODE] if technical/mixed
 
-Return ONLY a JSON array of ${questionCount} question strings. Example: ["Question 1?", "[CODE] Write a function to..."]`;
+Return ONLY a JSON object with a "questions" array containing ${questionCount} question strings. Example: {"questions":["Question 1?", "[CODE] Write a function to..."]}`;
 
-    const text = await askAI(prompt, 800);
-    const jsonMatch = text.match(/\[[\s\S]*/);
-    if (!jsonMatch) throw new Error("No JSON array in response");
-    const questions = JSON.parse(fixTruncatedJson(jsonMatch[0]));
+    const text = await askAI(prompt, 1200, true);
+    const response = parseJsonObject(text);
+    const questions = response.questions;
+    if (!Array.isArray(questions) || questions.some((question) => typeof question !== "string")) {
+      throw new Error("AI response must contain a questions array of strings");
+    }
 
     const interview = await Interview.create({
       userId: req.userID,
@@ -195,10 +191,8 @@ Provide a JSON response with this exact structure:
 
 Be honest and constructive. Always highlight genuine positives. Deduct points for warnings (${warningCount} warnings detected).`;
 
-    const text = await askAI(prompt, 900);
-    const jsonMatch = text.match(/\{[\s\S]*/);
-    if (!jsonMatch) throw new Error("No JSON in response");
-    const analysis = JSON.parse(fixTruncatedJson(jsonMatch[0]));
+    const text = await askAI(prompt, 1800, true);
+    const analysis = parseJsonObject(text);
 
     await Interview.findByIdAndUpdate(interviewId, {
       answers,
