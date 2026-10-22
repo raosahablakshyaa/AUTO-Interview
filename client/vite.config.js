@@ -13,12 +13,12 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'redux-vendor': ['@reduxjs/toolkit', 'react-redux'],
-          'motion': ['motion'],
-          'monaco': ['@monaco-editor/react'],
-          'firebase': ['firebase'],
+        manualChunks(id) {
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') || id.includes('node_modules/react-router-dom')) return 'react-vendor';
+          if (id.includes('node_modules/@reduxjs') || id.includes('node_modules/react-redux')) return 'redux-vendor';
+          if (id.includes('node_modules/motion')) return 'motion';
+          if (id.includes('node_modules/@monaco-editor')) return 'monaco';
+          if (id.includes('node_modules/firebase') || id.includes('node_modules/@firebase')) return 'firebase';
         }
       }
     },
