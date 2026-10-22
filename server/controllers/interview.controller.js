@@ -13,7 +13,8 @@ const askAI = async (prompt) => {
     messages: [{ role: "user", content: prompt }],
     temperature: 0.7,
   });
-  return res.choices[0].message.content;
+  // Strip <think>...</think> tags that qwen model adds
+  return res.choices[0].message.content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
 };
 
 export const replyToDoubt = async (req, res) => {
