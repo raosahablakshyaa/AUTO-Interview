@@ -8,12 +8,12 @@ import User from "../models/user.model.js";
 const getGroq = () => new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 const fixTruncatedJson = (str) => {
-  // Find the last complete key-value by trimming to last valid } or ]
   let s = str.trim();
-  // Remove trailing incomplete key-value pairs
-  s = s.replace(/,\s*"[^"]*"\s*:\s*[^,}\]]*$/, "");
+  // Remove trailing incomplete key-value
+  s = s.replace(/,\s*"[^"]*"\s*:\s*"[^"]*$/, "");
+  s = s.replace(/,\s*"[^"]*"\s*:\s*[^,{}\[\]"]*$/, "");
   s = s.replace(/,\s*"[^"]*"\s*:?\s*$/, "");
-  // Close all open arrays and objects
+  // Close open brackets
   const opens = [];
   for (const ch of s) {
     if (ch === '{') opens.push('}');
@@ -30,14 +30,8 @@ const askAI = async (prompt, maxTokens = 950) => {
     messages: [{ role: "user", content: prompt }],
     temperature: 0.7,
     max_tokens: maxTokens,
-    max_completion_tokens: maxTokens,
   });
-  const raw = res.choices[0].message.content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
-  // Fix truncated JSON by finding last complete closing brace/bracket
-  const objEnd = raw.lastIndexOf("}");
-  const arrEnd = raw.lastIndexOf("]");
-  const end = Math.max(objEnd, arrEnd);
-  return end !== -1 ? raw.slice(0, end + 1) : raw;
+  return res.choices[0].message.content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
 };
 
 export const replyToDoubt = async (req, res) => {
