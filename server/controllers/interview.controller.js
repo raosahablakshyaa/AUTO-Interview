@@ -13,7 +13,7 @@ const getGroq = () => {
 
 const askAI = async (prompt) => {
   const res = await getGroq().chat.completions.create({
-    model: "llama-3.1-8b-instant",
+    model: "qwen/qwen3.8-27b",
     messages: [{ role: "user", content: prompt }],
     temperature: 0.7,
   });
