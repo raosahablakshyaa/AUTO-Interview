@@ -5,6 +5,8 @@ const pdfParse = require("pdf-parse");
 import Interview from "../models/interview.model.js";
 import User from "../models/user.model.js";
 
+const getGroq = () => new Groq({ apiKey: process.env.GROQ_API_KEY });
+
 const fixTruncatedJson = (str) => {
   // Find the last complete key-value by trimming to last valid } or ]
   let s = str.trim();
