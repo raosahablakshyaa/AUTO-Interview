@@ -7,7 +7,7 @@ import User from "../models/user.model.js";
 
 const getGroq = () => new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-const askAI = async (prompt, maxTokens = 900) => {
+const askAI = async (prompt, maxTokens = 950) => {
   const res = await getGroq().chat.completions.create({
     model: "openai/gpt-oss-20b",
     messages: [{ role: "user", content: prompt }],
@@ -15,7 +15,12 @@ const askAI = async (prompt, maxTokens = 900) => {
     max_tokens: maxTokens,
     max_completion_tokens: maxTokens,
   });
-  return res.choices[0].message.content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+  const raw = res.choices[0].message.content.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+  // Fix truncated JSON by finding last complete closing brace/bracket
+  const objEnd = raw.lastIndexOf("}");
+  const arrEnd = raw.lastIndexOf("]");
+  const end = Math.max(objEnd, arrEnd);
+  return end !== -1 ? raw.slice(0, end + 1) : raw;
 };
 
 export const replyToDoubt = async (req, res) => {
@@ -45,48 +50,48 @@ export const analyzeResume = async (req, res) => {
   try {
     const pdfBuffer = req.file.buffer;
     const pdfData = await pdfParse(pdfBuffer);
-    const resumeText = pdfData.text.slice(0, 3000);
+    const resumeText = pdfData.text.slice(0, 2000);
 
-    const prompt = `You are a resume scoring AI. Analyze this resume and return ONLY valid JSON, no markdown, no extra text.
+    const prompt = `Analyze this resume. Return ONLY valid JSON, no markdown.
 
 Resume:
 ${resumeText}
 
-Return this exact JSON:
+JSON:
 {
   "score": <0-100>,
-  "verdict": "good" | "average" | "poor",
-  "summary": "2-3 sentence assessment",
-  "sectionScores": {
-    "basicDetails": { "score": <0-10>, "max": 10, "feedback": "brief feedback", "missing": [] },
-    "professionalSummary": { "score": <0-10>, "max": 10, "feedback": "brief feedback", "rewrite": "" },
-    "education": { "score": <0-10>, "max": 10, "feedback": "brief feedback", "missing": [] },
-    "experience": { "score": <0-25>, "max": 25, "feedback": "brief feedback", "issues": [] },
-    "projects": { "score": <0-20>, "max": 20, "feedback": "brief feedback", "issues": [] },
-    "certifications": { "score": <0-7>, "max": 7, "feedback": "brief feedback", "suggestions": [] },
-    "skills": { "score": <0-10>, "max": 10, "feedback": "brief feedback", "missing": [] },
-    "formatting": { "score": <0-8>, "max": 8, "feedback": "brief feedback", "issues": [] }
-  },
+  "verdict": "good"|"average"|"poor",
+  "summary": "2 sentence assessment",
   "atsScore": <0-100>,
-  "atsTips": ["tip1", "tip2", "tip3"],
-  "bulletPointAnalysis": { "hasMetrics": true, "usesActionVerbs": true, "feedback": "brief" },
-  "strongPoints": ["point1", "point2", "point3"],
-  "weakPoints": ["point1", "point2", "point3"],
-  "keywordsFound": ["kw1", "kw2", "kw3"],
-  "keywordsMissing": ["kw1", "kw2", "kw3", "kw4", "kw5"],
-  "experienceAnalysis": "brief analysis",
-  "educationAnalysis": "brief analysis",
-  "skillsAnalysis": "brief analysis",
-  "improvements": [
-    { "section": "name", "priority": "high", "issue": "problem", "tip": "fix" },
-    { "section": "name", "priority": "medium", "issue": "problem", "tip": "fix" },
-    { "section": "name", "priority": "low", "issue": "problem", "tip": "fix" }
-  ],
+  "strongPoints": ["s1","s2","s3"],
+  "weakPoints": ["w1","w2","w3"],
+  "keywordsFound": ["k1","k2","k3"],
+  "keywordsMissing": ["k1","k2","k3","k4","k5"],
+  "atsTips": ["t1","t2","t3"],
+  "bulletPointAnalysis": {"hasMetrics": true, "usesActionVerbs": true, "feedback": "brief"},
   "missingSection": [],
-  "overallTips": ["tip1", "tip2", "tip3"]
+  "overallTips": ["tip1","tip2","tip3"],
+  "experienceAnalysis": "brief",
+  "educationAnalysis": "brief",
+  "skillsAnalysis": "brief",
+  "improvements": [
+    {"section": "s", "priority": "high", "issue": "i", "tip": "t"},
+    {"section": "s", "priority": "medium", "issue": "i", "tip": "t"},
+    {"section": "s", "priority": "low", "issue": "i", "tip": "t"}
+  ],
+  "sectionScores": {
+    "basicDetails": {"score": 0, "max": 10, "feedback": "brief", "missing": []},
+    "professionalSummary": {"score": 0, "max": 10, "feedback": "brief", "rewrite": ""},
+    "education": {"score": 0, "max": 10, "feedback": "brief", "missing": []},
+    "experience": {"score": 0, "max": 25, "feedback": "brief", "issues": []},
+    "projects": {"score": 0, "max": 20, "feedback": "brief", "issues": []},
+    "certifications": {"score": 0, "max": 7, "feedback": "brief", "suggestions": []},
+    "skills": {"score": 0, "max": 10, "feedback": "brief", "missing": []},
+    "formatting": {"score": 0, "max": 8, "feedback": "brief", "issues": []}
+  }
 }`;
 
-    const text = await askAI(prompt, 900);
+    const text = await askAI(prompt, 950);
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     const analysis = JSON.parse(jsonMatch[0]);
 
